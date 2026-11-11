@@ -17,6 +17,24 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-11: conexión de Snowflake con dbt Platform mediante clave RSA
+**Qué hice:** añadí un script de Python (Snowpark) que genera un par de claves
+RSA de 2048 bits: la clave privada cifrada en formato PKCS#8 con una passphrase
+aleatoria, y la sentencia `alter user ... set rsa_public_key` con la clave
+pública. Ejecuté el `alter user` con SECURITYADMIN y configuré la conexión en dbt
+Platform con mi usuario, la clave privada y la passphrase, usando el rol
+DEV_TRANSFORM_ROLE, el warehouse WH_PROYECTO y DEV_SILVER_DB.
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- Autenticación por clave en lugar de usuario y contraseña: no se guarda ninguna
+  contraseña en la configuración de dbt y porque mi cuenta exige MFA.
+
+**Problemas encontrados y cómo los resolví:** ninguno.
+
+**Pendiente / siguiente paso:** borrar la salida del worksheet con la clave y la
+passphrase, comprobar la conexión con `dbt debug` o el botón de test, y crear
+las sources y los modelos stg_*.
+
 ### 2026-11-09: entorno Snowflake y carga de bronze (scripts 01, 02 y 03)
 **Qué hice:** ejecuté los tres scripts de la plantilla del curso, adaptados al
 proyecto:
