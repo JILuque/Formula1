@@ -17,11 +17,60 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
-### 2026-11-09: forma de cargar los CSV en Snowflake
-**Qué hice:** valoré subir los CSV a un repositorio de GitHub y cargarlos desde ahí.
-**Por qué lo hice así (y qué alternativa descarté):** descarto cargar desde GitHub porque `COPY INTO` lee de stages internos o de almacenamiento en la nube, y usar un repositorio añadiría una integración con permisos de administrador sin ninguna ventaja. Los datos son una descarga estática de Kaggle, así que la carga manual a un stage interno es suficiente y se justifica como carga puntual. Los CSV se guardarán también en el repositorio del proyecto solo para que sea reproducible.
+### 2026-11-11: conexión de Snowflake con dbt Platform mediante clave RSA
+**Qué hice:** añadí un script de Python (Snowpark) que genera un par de claves
+RSA de 2048 bits: la clave privada cifrada en formato PKCS#8 con una passphrase
+aleatoria, y la sentencia `alter user ... set rsa_public_key` con la clave
+pública. Ejecuté el `alter user` con SECURITYADMIN y configuré la conexión en dbt
+Platform con mi usuario, la clave privada y la passphrase, usando el rol
+DEV_TRANSFORM_ROLE, el warehouse WH_PROYECTO y DEV_SILVER_DB.
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- Autenticación por clave en lugar de usuario y contraseña: no se guarda ninguna
+  contraseña en la configuración de dbt y porque mi cuenta exige MFA.
+
 **Problemas encontrados y cómo los resolví:** ninguno.
-**Pendiente / siguiente paso:** ejecutar el script de carga en Snowflake y comprobar los recuentos.
+
+**Pendiente / siguiente paso:** borrar la salida del worksheet con la clave y la
+passphrase, comprobar la conexión con `dbt debug` o el botón de test, y crear
+las sources y los modelos stg_*.
+
+### 2026-11-09: entorno Snowflake y carga de bronze (scripts 01, 02 y 03)
+**Qué hice:** ejecuté los tres scripts de la plantilla del curso, adaptados al
+proyecto:
+- 01: warehouse WH_PROYECTO, databases bronze/silver/gold para DEV, PRE y PRO,
+  roles de transformación por entorno y REPORTING_ROLE.
+- 02: carga de los 8 CSV de F1 en DEV_BRONZE_DB.f1 (stage carga_bronze,
+  file format csv_bronze y COPY INTO).
+- 03: clones PRE_BRONZE_DB y PRO_BRONZE_DB a partir de DEV_BRONZE_DB, y permisos
+  de lectura sobre bronze para cada rol de su entorno.
+Comprobé los recuentos (results 26759, etc.) y que DEV_TRANSFORM_ROLE puede leer
+bronze. [confirmar que cuadraron todos]
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- Sigo la plantilla del curso y solo cambio lo propio de mi fuente.
+- Schema f1 en lugar de kaggle_f1: nos dijeron que el schema no suele llevar el
+  nombre de la fuente; f1 describe el contenido.
+- Sin columnas _fivetran_*: mis datos vienen de un CSV de Kaggle, no de Fivetran.
+  Mantengo _loaded_at (DEFAULT current_timestamp()) para poder usar el freshness
+  de dbt.
+- Nulos: el dataset marca los nulos como \N; el file format los trata como NULL,
+  además de la cadena vacía.
+- Ids y tiempos como varchar en bronze, como en la plantilla; los tipos
+  definitivos se aplican en staging. Medidas numéricas y fechas sí llevan tipo.
+- No uso Fivetran: la fuente es una descarga estática y no necesita
+  sincronización recurrente, así que simulo la ingesta con una carga manual a un
+  stage, como en el curso.
+- Los CSV también se guardan en el repo (carpeta de datos) solo para que el
+  proyecto sea reproducible; no se carga desde GitHub porque COPY INTO lee de
+  stages, no de repositorios.
+
+**Problemas encontrados y cómo los resolví:** ninguno.
+
+**Pendiente / siguiente paso:** crear el proyecto dbt (profiles.yml, sources
+apuntando a DEV_BRONZE_DB.f1 y los 8 modelos stg_*). Aviso para el futuro: si
+recargo bronze con el script 02 (usa create or replace table), hay que repetir
+el 03 para recrear los clones y los permisos.
 
 ### 2026-11-06: criterio de mínimo de carreras y script de carga bronze
 **Qué hice:** fijé un mínimo de 36 carreras para entrar en el top del ranking y preparé el script SQL de carga de las 8 tablas en el esquema `RAW`.
@@ -54,6 +103,10 @@ Fecha de entrega: 25 de noviembre de 2026.
 | Mínimo de 36 carreras con columna de marca | Sin filtro; 5 o 24 carreras | Evita que una sola temporada brillante entre en el top |
 | Carga manual a stage interno | Cargar desde GitHub | Datos estáticos; sin integraciones innecesarias |
 | Periodo 2000-2024 | Otro rango | Justificación por redactar |
+| Schema de bronze llamado f1 | kaggle_f1 (nombre de la fuente) | Describe el contenido, no el origen |
+| Sin columnas _fivetran_*; _loaded_at sí | Copiar las columnas de la plantilla | La fuente es un CSV de Kaggle; _loaded_at permite el freshness |
+| Ids y tiempos en varchar en bronze | Tipar todo en bronze | Convención de la plantilla; tipos definitivos en staging |
+| No usar Fivetran | Montar un conector | Fuente estática, sin sincronización recurrente |
 
 ## Errores y soluciones (rellenar según aparezcan)
 
