@@ -1,0 +1,29 @@
+# =============================================================================
+# Seeds
+# =============================================================================
+
+seeds:
+  - name: status_classification
+    description:  Clasificación de los 139 estados de resultado de carrera en cinco categorías. 
+      Regla de negocio propia del proyecto, no existe en el origen. 
+      Determina qué carreras se excluyen de C1 y C3 y qué abandonos cuentan en C2.
+    columns:
+      - name: status_id
+        description: Identificador del estado; coincide con statusId de la tabla status de Bronze.
+        data_tests:
+          - unique
+          - not_null
+      - name: status
+        description: Texto original del estado, tal como llega de la fuente.  
+        data_tests:
+          - unique
+      - name: status_category
+        description: Categoría asignada. finished, mechanical (fallo del coche, causa
+          ajena al piloto), driver_incident (accidente o incidente en pista),
+          other_not_finished (causa administrativa, médica o desconocida) o
+          not_started (no entró en parrilla).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['finished', 'mechanical', 'driver_incident', 'other_not_finished', 'not_started']
