@@ -17,6 +17,65 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-15: seed de clasificación de estados (status_classification)
+**Qué hice:** revisé la guía del Día 1 (seeds y sources) y decidí qué aplicar a
+mi proyecto. Definí la clasificación de los 139 estados de `status` en cinco
+categorías y generé el CSV `status_classification.csv`, que será un seed en
+Silver. Dentro de `/dbt` (subdirectorio configurado en dbt Platform), el seed irá
+en `seeds/`. [Pendiente: configurarlo y ejecutar `dbt seed`.]
+
+**Por qué un seed (y qué alternativas descarté):**
+- La clasificación no existe en origen: `status` solo trae `statusId` y el texto.
+  Es una regla de negocio mía, así que no va a Bronze, que debe conservar el
+  dato tal como llega de la fuente.
+- Alternativa descartada: un `CASE` en un modelo de Silver. Es válida, pero
+  deja 139 estados enterrados en SQL, sin descripción ni tests propios. La guía
+  del curso recomienda los seeds para listas cortas y estables que no existen
+  en origen, como un mapeo de categorías.
+- `status` se queda intacta en Bronze, y el seed se une a ella por `status_id`.
+
+**Categorías y criterios:**
+- `finished` (34): terminó, incluidas las vueltas de retraso.
+- `mechanical` (81): fallo del coche o causa ajena al piloto. Incluye neumáticos
+  y `Debris`, `Handling`, `Out of fuel` y `Launch control`.
+- `driver_incident` (4): solo `Accident`, `Collision`, `Spun off` y
+  `Collision damage`. Regla: únicamente lo que el propio estado describe como
+  un error o incidente en pista.
+- `other_not_finished` (17): causas administrativas, médicas, de seguridad o sin
+  causa clara. Incluye `Retired`, `Withdrew`, `Not restarted`, `Not classified`,
+  `Stalled`, lesiones, enfermedad y exclusiones.
+- `not_started` (3): solo quien nunca estuvo en parrilla (`Did not qualify`,
+  `Did not prequalify`, `107% Rule`).
+
+**Decisiones concretas y su porqué:**
+- `Retired` (76 filas, 0,75 % de 10.079 en 2000-2024) va a `other_not_finished`.
+  El estado no indica causa. Revisé una muestra de 6: 5 fueron fallos del coche
+  y 1 es ambiguo, lo que descarta `driver_incident` pero no basta para asumir
+  `mechanical` en las 76.
+- Neumáticos y `Debris` quedan en `mechanical` ampliando su definición a "causa
+  ajena al piloto". Revisé casos como Vettel (Bélgica 2015, clasificado 12º con
+  un reventón) y un reventón atribuido a residuos metálicos en pista.
+- `Withdrew`, `Not restarted` y `Not classified` entran en `other_not_finished`: los datos
+  muestran que algunos sí corrieron vueltas.
+- `Stalled` es ambiguo (fallo del coche o error del piloto), así que va a
+  `other_not_finished`, el mismo criterio que `Retired`.
+- Lesiones, enfermedad y seguridad (13 filas) van a `other_not_finished`: no dicen
+  nada sobre cómo conduce el piloto.
+- **Clasificado ≠ terminó la carrera.** Un piloto está clasificado si completa al
+  menos el 90 % de las vueltas del ganador (`positionText` numérico). De las
+  1.299 filas mecánicas en 2000-2024, 120 (9 %) están clasificadas.
+- **Opción A elegida:** se excluye de C1 y C3 toda fila `mechanical`, esté
+  clasificada o no. Motivo: se explica en una frase y no depende del umbral del
+  90 %. La opción B (excluir solo las no clasificadas) queda como análisis de
+  sensibilidad.
+
+**Problemas encontrados y cómo los resolví:** ninguno.
+
+**Pendiente / siguiente paso:** configurar el seed en `dbt_project.yml` (destino en
+Silver, `status_id` como `varchar` con `+column_types`), crear `seeds/_seeds.yml`
+con descripciones y tests (`unique` en `status_id`, `accepted_values` en la
+categoría), ejecutar `dbt seed` y comprobar que hay 139 filas.
+
 ### 2026-11-11: conexión de Snowflake con dbt Platform mediante clave RSA
 **Qué hice:** añadí un script de Python (Snowpark) que genera un par de claves
 RSA de 2048 bits: la clave privada cifrada en formato PKCS#8 con una passphrase
@@ -107,6 +166,10 @@ el 03 para recrear los clones y los permisos.
 | Sin columnas _fivetran_*; _loaded_at sí | Copiar las columnas de la plantilla | La fuente es un CSV de Kaggle; _loaded_at permite el freshness |
 | Ids y tiempos en varchar en bronze | Tipar todo en bronze | Convención de la plantilla; tipos definitivos en staging |
 | No usar Fivetran | Montar un conector | Fuente estática, sin sincronización recurrente |
+| Clasificación de estados como seed (no CASE ni tabla en Bronze) | CASE en un modelo de Silver; CSV cargado en Bronze | Es regla de negocio que no existe en origen; versionada en Git, documentada y testeada aparte |
+| `driver_incident` solo para accidentes y colisiones | Incluir también neumáticos o `Retired` | Solo lo que el estado describe como error en pista, para no penalizar al piloto sin evidencia |
+| `Retired` y `Stalled` en `other_not_finished` | `mechanical` o `driver_incident` | El estado no indica causa; la muestra revisada no basta para generalizar |
+| Opción A: excluir todo `mechanical` de C1 y C3 | Excluir solo los no clasificados (B) | Regla simple y no depende del umbral del 90 %; B se prueba en la sensibilidad |
 
 ## Errores y soluciones (rellenar según aparezcan)
 
