@@ -17,6 +17,25 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-16: configuración del seed y entorno de dbt
+**Qué hice:** creé `seeds/status_classification.csv` (139 filas) y `seeds/_seed.yml`
+con descripciones y 5 tests. Configuré el seed en `dbt_project.yml` (destino en
+Silver mediante `DBT_SILVER_DB`, schema `seeds` y tipos fijados con
+`+column_types`). Renombré el proyecto a `f1`. `dbt parse`, `dbt seed` y
+`dbt test` pasaron. Recuento en Snowflake: [139].
+
+**Decisiones de entorno:**
+- Dos entornos (DEV y PRO), sin PRE: proyecto en solitario, sin otro equipo
+  que valide. Las databases PRE existen en Snowflake por la plantilla, pero no
+  se usan.
+- Trabajo en la rama `DEV` con pull request a `main`.
+- Versión de dbt: v1 (latest). En producción usaré la misma.
+
+**Problemas encontrados:** ninguno.
+
+**Siguiente paso:** declarar las sources de Bronze (`DEV_BRONZE_DB.f1`) con
+freshness sobre `_loaded_at`, y después los modelos `stg_*`.
+
 ### 2026-11-15: seed de clasificación de estados (status_classification)
 **Qué hice:** revisé la guía del Día 1 (seeds y sources) y decidí qué aplicar a
 mi proyecto. Definí la clasificación de los 139 estados de `status` en cinco
