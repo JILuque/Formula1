@@ -42,7 +42,7 @@ seeds:
     +schema: seeds
     status_classification:
       +column_types:
-        status_id: varchar(10)
+        status_id: integer
         status: varchar(100)
         status_category: varchar(30)
 
