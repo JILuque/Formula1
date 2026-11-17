@@ -78,7 +78,7 @@ sources:
           - name: raceId
             description: "Identificador de la carrera."
           - name: year
-            description: "Temporada."
+            description: "Año de temporada."
           - name: round
             description: "Número de la carrera dentro de la temporada."
           - name: circuitId
@@ -88,7 +88,7 @@ sources:
           - name: date
             description: "Fecha de la carrera."
           - name: time
-            description: "Hora de la carrera (texto); vacía en carreras antiguas."
+            description: "Hora de la carrera (texto); vacío en carreras antiguas."
           - name: url
             description: "Enlace de Wikipedia de la carrera."
           - name: fp1_date
@@ -158,7 +158,7 @@ sources:
           - name: driverId
             description: "Piloto."
           - name: constructorId
-            description: "Equipo con el que corrió."
+            description: "Escudería para la que corrió."
           - name: number
             description: "Dorsal con el que corrió."
           - name: grid
@@ -168,7 +168,7 @@ sources:
           - name: positionText
             description: "Posición como texto; una letra (R, D, W, N, F, E) si no fue clasificado."
           - name: positionOrder
-            description: "Orden final de la carrera, siempre informado."
+            description: "Orden final de la carrera, incluyendo a los no clasificaods."
           - name: points
             description: "Puntos obtenidos."
           - name: laps
@@ -200,7 +200,7 @@ sources:
           - name: driverId
             description: "Piloto."
           - name: constructorId
-            description: "Equipo con el que corrió."
+            description: "Escuderia con la que corrió."
           - name: number
             description: "Dorsal con el que corrió."
           - name: grid
@@ -210,7 +210,7 @@ sources:
           - name: positionText
             description: "Posición como texto; una letra si no fue clasificado."
           - name: positionOrder
-            description: "Orden final del sprint."
+            description: "Orden final del sprint, incluyendo a los no clasificados."
           - name: points
             description: "Puntos del sprint."
           - name: laps
