@@ -191,6 +191,7 @@ el 03 para recrear los clones y los permisos.
 | Opción A: excluir todo `mechanical` de C1 y C3 | Excluir solo los no clasificados (B) | Regla simple y no depende del umbral del 90 %; B se prueba en la sensibilidad |
 | Dos entornos (DEV y PRO), sin PRE | Los tres entornos del curso | Proyecto en solitario: PRE sería un paso intermedio sin otro equipo que valide; las databases PRE existen en Snowflake por la plantilla pero no se usan |
 | Rama de trabajo DEV, PR a main | Una rama por tarea | Un solo desarrollador; se conserva el pull request como punto de revisión antes de producción |
+| Seed con `status_id` como `integer` | `varchar` (el tipo de Bronze) | El join se hace contra los `stg_*`, donde los ids ya son enteros; el seed lleva el tipo final. Corregido tras la primera versión |
 
 ## Errores y soluciones (rellenar según aparezcan)
 
