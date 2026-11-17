@@ -17,6 +17,68 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-17: sources de Bronze y ajuste del tipo del seed
+**Qué hice:** creé `models/staging/f1/_f1__sources.yml` con las 8 tablas de
+`DEV_BRONZE_DB.f1` (circuits, constructors, drivers, races, status, qualifying,
+results, sprint_results) y todas sus columnas, incluida `_loaded_at`, cada una
+con su descripción. La database se resuelve con `env_var('DBT_BRONZE_DB')`.
+Ajusté el seed `status_classification` para que `status_id` sea `integer` y
+lo recreé con `dbt seed --full-refresh`. [`dbt parse` OK / preview de
+`source('f1', 'status')` devuelve filas].
+
+**Por qué lo hice así (y qué alternativas descarté):**
+- **Sin freshness.** Bronze se cargó una vez, a mano, desde un dataset
+  histórico y estático; el umbral de 24/48 h de la guía fallaría siempre.
+  Mis profesores sugirieron usarlo para verificar que los datos llegan hasta
+  2024; lo valoré (apuntando `loaded_at_field` a `races.date`), pero compara
+  contra la fecha de hoy y los umbrales se desplazarían cada día, así que no
+  comprueba exactamente "hasta 2024". Se activaría si amplío con más
+  temporadas o datos en directo; `_loaded_at` se mantiene en Bronze por la
+  convención de la plantilla. La cobertura 2000-2024 la comprobaré con un test
+  cuando veamos los tests en el curso.
+- **Todas las columnas documentadas** (no solo las clave): sigue el ejercicio
+  de la guía y deja el catálogo completo en `dbt docs`.
+- **`status_id` como `integer` en el seed:** el join se hará contra los `stg_*`,
+  donde los ids ya serán enteros. Regla general: Bronze guarda los ids como
+  `varchar` tal como llegan y staging los convierte al tipo real.
+- **Tests de sources aplazados** hasta el tema de tests del curso. Mi
+  inclinación es ponerlos en staging.
+
+**Cosas que aprendí de los datos:**
+- `drivers.number` es el número permanente elegido por el piloto (sistema
+  desde 2014); solo 59 de los 861 pilotos lo tienen. No es el dorsal de cada
+  carrera, ese está en `results.number`.
+- `results.position` solo existe para pilotos clasificados (≥ 90 % de las
+  vueltas del ganador); `positionOrder` siempre tiene valor y ordena
+  detrás a los no clasificados por vueltas. En 2000-2024 son idénticos
+  cuando `position` está informada (las únicas 13 filas que difieren son de
+  Brasil 1983). `positionText` indica si la posición es real (número) o
+  administrativa (letra).
+- `grid = 0` cuando no hay posición de parrilla.
+
+**Problemas encontrados:** ninguno.
+
+**Pendiente / siguiente paso:** Siguiente tema de la guía (staging, Día 2).
+
+### 2026-11-16: configuración del seed y entorno de dbt
+**Qué hice:** creé `seeds/status_classification.csv` (139 filas) y `seeds/_seed.yml`
+con descripciones y 5 tests. Configuré el seed en `dbt_project.yml` (destino en
+Silver mediante `DBT_SILVER_DB`, schema `seeds` y tipos fijados con
+`+column_types`). Renombré el proyecto a `f1`. `dbt parse`, `dbt seed` y
+`dbt test` pasaron. Recuento en Snowflake: [139].
+
+**Decisiones de entorno:**
+- Dos entornos (DEV y PRO), sin PRE: proyecto en solitario, sin otro equipo
+  que valide. Las databases PRE existen en Snowflake por la plantilla, pero no
+  se usan.
+- Trabajo en la rama `DEV` con pull request a `main`.
+- Versión de dbt: v1 (latest). En producción usaré la misma.
+
+**Problemas encontrados:** ninguno.
+
+**Siguiente paso:** declarar las sources de Bronze (`DEV_BRONZE_DB.f1`) con
+freshness sobre `_loaded_at`, y después los modelos `stg_*`.
+
 ### 2026-11-15: seed de clasificación de estados (status_classification)
 **Qué hice:** revisé la guía del Día 1 (seeds y sources) y decidí qué aplicar a
 mi proyecto. Definí la clasificación de los 139 estados de `status` en cinco
@@ -172,6 +234,7 @@ el 03 para recrear los clones y los permisos.
 | Opción A: excluir todo `mechanical` de C1 y C3 | Excluir solo los no clasificados (B) | Regla simple y no depende del umbral del 90 %; B se prueba en la sensibilidad |
 | Dos entornos (DEV y PRO), sin PRE | Los tres entornos del curso | Proyecto en solitario: PRE sería un paso intermedio sin otro equipo que valide; las databases PRE existen en Snowflake por la plantilla pero no se usan |
 | Rama de trabajo DEV, PR a main | Una rama por tarea | Un solo desarrollador; se conserva el pull request como punto de revisión antes de producción |
+| Seed con `status_id` como `integer` | `varchar` (el tipo de Bronze) | El join se hace contra los `stg_*`, donde los ids ya son enteros; el seed lleva el tipo final. Corregido tras la primera versión |
 
 ## Errores y soluciones (rellenar según aparezcan)
 
