@@ -17,6 +17,49 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-17: sources de Bronze y ajuste del tipo del seed
+**Qué hice:** creé `models/staging/f1/_f1__sources.yml` con las 8 tablas de
+`DEV_BRONZE_DB.f1` (circuits, constructors, drivers, races, status, qualifying,
+results, sprint_results) y todas sus columnas, incluida `_loaded_at`, cada una
+con su descripción. La database se resuelve con `env_var('DBT_BRONZE_DB')`.
+Ajusté el seed `status_classification` para que `status_id` sea `integer` y
+lo recreé con `dbt seed --full-refresh`. [`dbt parse` OK / preview de
+`source('f1', 'status')` devuelve filas].
+
+**Por qué lo hice así (y qué alternativas descarté):**
+- **Sin freshness.** Bronze se cargó una vez, a mano, desde un dataset
+  histórico y estático; el umbral de 24/48 h de la guía fallaría siempre.
+  Mis profesores sugirieron usarlo para verificar que los datos llegan hasta
+  2024; lo valoré (apuntando `loaded_at_field` a `races.date`), pero compara
+  contra la fecha de hoy y los umbrales se desplazarían cada día, así que no
+  comprueba exactamente "hasta 2024". Se activaría si amplío con más
+  temporadas o datos en directo; `_loaded_at` se mantiene en Bronze por la
+  convención de la plantilla. La cobertura 2000-2024 la comprobaré con un test
+  cuando veamos los tests en el curso.
+- **Todas las columnas documentadas** (no solo las clave): sigue el ejercicio
+  de la guía y deja el catálogo completo en `dbt docs`.
+- **`status_id` como `integer` en el seed:** el join se hará contra los `stg_*`,
+  donde los ids ya serán enteros. Regla general: Bronze guarda los ids como
+  `varchar` tal como llegan y staging los convierte al tipo real.
+- **Tests de sources aplazados** hasta el tema de tests del curso. Mi
+  inclinación es ponerlos en staging.
+
+**Cosas que aprendí de los datos:**
+- `drivers.number` es el número permanente elegido por el piloto (sistema
+  desde 2014); solo 59 de los 861 pilotos lo tienen. No es el dorsal de cada
+  carrera, ese está en `results.number`.
+- `results.position` solo existe para pilotos clasificados (≥ 90 % de las
+  vueltas del ganador); `positionOrder` siempre tiene valor y ordena
+  detrás a los no clasificados por vueltas. En 2000-2024 son idénticos
+  cuando `position` está informada (las únicas 13 filas que difieren son de
+  Brasil 1983). `positionText` indica si la posición es real (número) o
+  administrativa (letra).
+- `grid = 0` cuando no hay posición de parrilla.
+
+**Problemas encontrados:** ninguno.
+
+**Pendiente / siguiente paso:** Siguiente tema de la guía (staging, Día 2).
+
 ### 2026-11-16: configuración del seed y entorno de dbt
 **Qué hice:** creé `seeds/status_classification.csv` (139 filas) y `seeds/_seed.yml`
 con descripciones y 5 tests. Configuré el seed en `dbt_project.yml` (destino en
