@@ -50,4 +50,9 @@ seeds:
 
 # models
 models:
-  #f1:
+  f1:
+    staging:
+      +materialized: view
+      +database: "{{ env_var('DBT_SILVER_DB') }}"
+      f1:
+        +schema: f1
