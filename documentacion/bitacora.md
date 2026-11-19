@@ -17,6 +17,56 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-19: cambio del origen a 3 ficheros planos
+**Qué hice:** sustituí los 8 CSV originales por tres ficheros planos
+(`calendario`, `resultados`, `clasificacion`) con todos los años (1950-2024).
+Rehice el script 02 (carga de Bronze: 3 tablas en `DEV_BRONZE_DB.f1`, con
+limpieza de las 8 antiguas) y el script 03, que ahora clona solo PRO. Rehice las
+sources (3 tablas, todas las columnas documentadas) y ajusté el seed.
+Recuentos en Bronze: calendario 1125, resultados 26759, clasificacion 10494
+(iguales en DEV y PRO). `dbt parse`, `dbt seed`, `dbt test` (6 tests) y
+`dbt build` pasan.
+
+**Origen de los datos:** los ficheros son datos de F1 publicados en Kaggle,
+derivados del dataset *Formula 1 World Championship (1950-2020)* de Rohan Rao.
+
+
+**Por qué lo hice así (y qué alternativas descarté):**
+- **Ficheros planos desnormalizados** en lugar de las 8 tablas relacionales:
+  el profesorado pidió datos desnormalizados y que el linaje no sea lineal. Con
+  Bronze plano, Silver tiene que "desgranar" las entidades (pilotos, equipos,
+  circuitos, carreras), y ahí aparecen uniones, claves nuevas y ramas reales.
+  Descarté mantener las 8 tablas porque ya vienen normalizadas y el linaje
+  saldría casi lineal.
+- **Bronze conserva todos los años** (1950-2024) y el filtro 2000-2024 se
+  aplica después, en Silver o Gold: Bronze es el dato crudo y la ventana
+  del caso de uso es una regla de negocio.
+- **Sin ids en Bronze:** las filas se identifican por clave natural
+  (`season_year` + `round`, `driver_ref`, `constructor_ref`). Los ids se
+  generan en Silver como claves sustitutas.
+- **El seed se une por `status` (texto) y no por `status_id`:** los ids
+  originales ya no viajan en Bronze. Comprobé que el texto es único en los 139
+  estados y que los 137 estados de `resultados` y los 8 del sprint están todos en
+  el seed. Se añadió `not_null` al texto, que ahora es la clave de unión.
+- **Script 03 solo con PRO:** sin entorno PRE. Las databases PRE existen pero no
+  se usan.
+
+**Cosas que aprendí de los datos:**
+- Los sprint vienen dentro de `clasificacion`, al final de cada fila de
+  clasificación. Los 360 sprint originales están todos, así que no se perdió
+  ninguno. En Silver hay que separarlos otra vez.
+- `resultados` tiene 85 combinaciones repetidas de (temporada, ronda, piloto),
+  todas anteriores a 1979 (coches compartidos). En 2000-2024 no hay ninguna, así
+  que el test de unicidad debe aplicarse después del filtro del periodo.
+- Los nulos vienen marcados como `\N`; el formato de fichero de Snowflake los
+  convierte a NULL.
+
+**Problemas encontrados:** [rellenar; por ejemplo, el seed tenía las columnas
+duplicadas al editar el YAML].
+
+**Pendiente / siguiente paso:** modelos de staging (`stg_f1__*`) y su
+configuración en `dbt_project.yml`; después, Silver.
+
 ### 2026-11-17: sources de Bronze y ajuste del tipo del seed
 **Qué hice:** creé `models/staging/f1/_f1__sources.yml` con las 8 tablas de
 `DEV_BRONZE_DB.f1` (circuits, constructors, drivers, races, status, qualifying,
