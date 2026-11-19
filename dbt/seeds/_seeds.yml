@@ -4,19 +4,20 @@
 
 seeds:
   - name: status_classification
-    description:  Clasificación de los 139 estados de resultado de carrera en cinco categorías. 
-      Regla de negocio propia del proyecto, no existe en el origen. 
+    description: Clasificación de los 139 estados de resultado de carrera en cinco categorías.
+      Regla de negocio propia del proyecto, no existe en el origen.
       Determina qué carreras se excluyen de C1 y C3 y qué abandonos cuentan en C2.
     columns:
       - name: status_id
-        description: Identificador del estado; coincide con statusId de la tabla status de Bronze.
+        description: Identificador interno del estado, solo de referencia; la unión con Bronze se hace por status.
         data_tests:
           - unique
           - not_null
       - name: status
-        description: Texto original del estado, tal como llega de la fuente.  
+        description: Texto original del estado; es la clave de unión con status de resultados y sprint_status de clasificacion.
         data_tests:
           - unique
+          - not_null
       - name: status_category
         description: Categoría asignada. finished, mechanical (fallo del coche, causa
           ajena al piloto), driver_incident (accidente o incidente en pista),

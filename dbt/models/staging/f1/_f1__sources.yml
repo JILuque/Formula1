@@ -8,88 +8,20 @@ sources:
     schema: f1
 
     tables:
-      - name: circuits
-        description: "Circuitos donde se han disputado carreras"
+      - name: calendario
+        description: "Calendario de carreras de 1950 a 2024, una fila por gran premio, con los datos del circuito incluidos. La carrera se identifica por season_year y round."
         columns:
-          - name: circuitId
-            description: "Identificador del circuito"
-          - name: circuitRef
-            description: "Nombre corto del circuito"
-          - name: name
-            description: "Nombre oficial del circuito"
-          - name: location
-            description: "Localidad del circuito"
-          - name: country
-            description: "País del circuito."
-          - name: lat
-            description: "Latitud en grados."
-          - name: lng
-            description: "Longitud en grados."
-          - name: alt
-            description: "Altitud en metros."
-          - name: url
-            description: "Enlace de Wikipedia del circuito."
-          - name: _loaded_at
-            description: "Momento en que la fila llegó a Bronze; la rellena Snowflake al cargar."
-
-      - name: constructors
-        description: "Constructores (escuderias) que han participado."
-        columns:
-          - name: constructorId
-            description: "Identificador del contructor."
-          - name: constructorRef
-            description: "Nombre corto del contructor."
-          - name: name
-            description: "Nombre del contructor."
-          - name: nationality
-            description: "Nacionalidad del contructor."
-          - name: url
-            description: "Enlace de Wikipedia del contructor."
-          - name: _loaded_at
-            description: "Momento en que la fila llegó a Bronze; la rellena Snowflake al cargar."
-
-      - name: drivers
-        description: "Pilotos que han participado."
-        columns:
-          - name: driverId
-            description: "Identificador del piloto."
-          - name: driverRef
-            description: "Nombre corto del piloto."
-          - name: number
-            description: "Número permanente elegido por el piloto (sistema vigente desde 2014); el último usado si se ha retirado. Vacío en pilotos anteriores."
-          - name: code
-            description: "Código de tres letras del piloto."
-          - name: forename
-            description: "Nombre del piloto."
-          - name: surname
-            description: "Apellido del piloto."
-          - name: dob
-            description: "Fecha de nacimiento."
-          - name: nationality
-            description: "Nacionalidad del piloto."
-          - name: url
-            description: "Enlace de Wikipedia del piloto."
-          - name: _loaded_at
-            description: "Momento en que la fila llegó a Bronze; la rellena Snowflake al cargar."
-
-      - name: races
-        description: "Carreras disputadas, una fila por gran premio."
-        columns:
-          - name: raceId
-            description: "Identificador de la carrera."
-          - name: year
-            description: "Año de temporada."
+          - name: season_year
+            description: "Temporada."
           - name: round
             description: "Número de la carrera dentro de la temporada."
-          - name: circuitId
-            description: "Circuito donde se disputó."
-          - name: name
+          - name: race_name
             description: "Nombre del gran premio."
-          - name: date
+          - name: race_date
             description: "Fecha de la carrera."
-          - name: time
-            description: "Hora de la carrera (texto); vacío en carreras antiguas."
-          - name: url
+          - name: race_time
+            description: "Hora de la carrera (texto); vacía en carreras más antiguas."
+          - name: race_url
             description: "Enlace de Wikipedia de la carrera."
           - name: fp1_date
             description: "Fecha de la primera sesión de entrenamientos libres."
@@ -108,122 +40,164 @@ sources:
           - name: quali_time
             description: "Hora de la clasificación (texto)."
           - name: sprint_date
-            description: "Fecha de la carrera sprint, en caso de haberse disputado."
+            description: "Fecha de la carrera sprint, si hubo."
           - name: sprint_time
             description: "Hora de la carrera sprint (texto)."
+          - name: circuit_ref
+            description: "Nombre corto del circuito; identifica al circuito."
+          - name: circuit_name
+            description: "Nombre oficial del circuito."
+          - name: circuit_location
+            description: "Localidad donde está el circuito."
+          - name: circuit_country
+            description: "País del circuito."
+          - name: circuit_lat
+            description: "Latitud del circuito en grados."
+          - name: circuit_lng
+            description: "Longitud del circuito en grados."
+          - name: circuit_alt
+            description: "Altitud del circuito en metros."
+          - name: circuit_url
+            description: "Enlace de Wikipedia del circuito."
           - name: _loaded_at
             description: "Momento en que la fila llegó a Bronze; la rellena Snowflake al cargar."
 
-      - name: status
-        description: "Catálogo de estados con los que termina (o no) un piloto una carrera."
-        columns:
-          - name: statusId
-            description: "Identificador del estado."
-          - name: status
-            description: "Descripción del estado."
-          - name: _loaded_at
-            description: "Momento en que la fila llegó a Bronze; la rellena Snowflake al cargar."
 
-      - name: qualifying
-        description: "Resultados de clasificación, una fila por piloto y carrera."
+      - name: resultados
+        description: "Resultados de carrera de 1950 a 2024, una fila por piloto y carrera, con los datos del piloto y del equipo incluidos. La carrera se identifica por season_year y round."
         columns:
-          - name: qualifyId
-            description: "Identificador de la fila de clasificación."
-          - name: raceId
-            description: "Carrera a la que pertenece."
-          - name: driverId
-            description: "Piloto."
-          - name: constructorId
-            description: "Equipo con el que corrió."
-          - name: number
-            description: "Dorsal con el que corrió."
-          - name: position
-            description: "Posición final en la clasificación."
-          - name: q1
-            description: "Mejor tiempo en la Q1 (texto)."
-          - name: q2
-            description: "Mejor tiempo en la Q2 (texto)."
-          - name: q3
-            description: "Mejor tiempo en la Q3 (texto)."
-          - name: _loaded_at
-            description: "Momento en que la fila llegó a Bronze; la rellena Snowflake al cargar."
-
-      - name: results
-        description: "Resultados de carrera, una fila por piloto y carrera."
-        columns:
-          - name: resultId
-            description: "Identificador del resultado."
-          - name: raceId
-            description: "Carrera a la que pertenece."
-          - name: driverId
-            description: "Piloto."
-          - name: constructorId
-            description: "Escudería para la que corrió."
-          - name: number
-            description: "Dorsal con el que corrió."
+          - name: season_year
+            description: "Temporada."
+          - name: round
+            description: "Número de la carrera dentro de la temporada."
+          - name: driver_forename
+            description: "Nombre del piloto."
+          - name: driver_surname
+            description: "Apellido del piloto."
+          - name: driver_dob
+            description: "Fecha de nacimiento del piloto."
+          - name: driver_ref
+            description: "Nombre corto del piloto; identifica al piloto."
+          - name: driver_number
+            description: "Número permanente elegido por el piloto (sistema vigente desde 2014); el último usado si se ha retirado. Vacío en pilotos anteriores."
+          - name: driver_code
+            description: "Código de tres letras del piloto."
+          - name: driver_nationality
+            description: "Nacionalidad del piloto."
+          - name: driver_url
+            description: "Enlace de Wikipedia del piloto."
+          - name: constructor_ref
+            description: "Nombre corto del equipo; identifica al equipo."
+          - name: constructor_name
+            description: "Nombre del equipo."
+          - name: constructor_nationality
+            description: "Nacionalidad del equipo."
+          - name: constructor_url
+            description: "Enlace de Wikipedia del equipo."
+          - name: car_number
+            description: "Dorsal con el que corrió esa carrera."
           - name: grid
             description: "Posición de salida; 0 cuando no hay posición de parrilla."
           - name: position
             description: "Posición final; vacía si el piloto no fue clasificado."
-          - name: positionText
+          - name: position_text
             description: "Posición como texto; una letra (R, D, W, N, F, E) si no fue clasificado."
-          - name: positionOrder
-            description: "Orden final de la carrera, incluyendo a los no clasificaods."
+          - name: position_order
+            description: "Orden final de la carrera, incluyendo a los no clasificados"
           - name: points
             description: "Puntos obtenidos."
           - name: laps
             description: "Vueltas completadas."
-          - name: time
+          - name: race_time_text
             description: "Tiempo total o diferencia con el ganador (texto)."
-          - name: milliseconds
+          - name: race_time_ms
             description: "Tiempo total en milisegundos."
-          - name: fastestLap
+          - name: fastest_lap
             description: "Número de la vuelta más rápida del piloto."
-          - name: rank
+          - name: fastest_lap_rank
             description: "Posición del piloto en el ranking de vueltas rápidas de la carrera."
-          - name: fastestLapTime
+          - name: fastest_lap_time
             description: "Tiempo de su vuelta más rápida (texto)."
-          - name: fastestLapSpeed
-            description: "Velocidad media en su vuelta más rápida."
-          - name: statusId
-            description: "Estado con el que terminó, referencia a status."
+          - name: fastest_lap_speed
+            description: "Velocidad media en su vuelta más rápida (km/h)."
+          - name: status
+            description: "Estado con el que terminó la carrera (texto); se clasifica con el seed status_classification."
           - name: _loaded_at
             description: "Momento en que la fila llegó a Bronze; la rellena Snowflake al cargar."
 
-      - name: sprint_results
-        description: "Resultados de las carreras sprint (solo desde 2021)."
+
+      - name: clasificacion
+        description: "Clasificación de 1994 a 2024, una fila por piloto y carrera, con los datos del piloto y del equipo incluidos. Incluye en la misma fila las columnas de la carrera sprint de ese fin de semana, cuando la hubo (desde 2021). La carrera se identifica por season_year y round."
         columns:
-          - name: resultId
-            description: "Identificador del resultado de sprint."
-          - name: raceId
-            description: "Carrera a la que pertenece."
-          - name: driverId
-            description: "Piloto."
-          - name: constructorId
-            description: "Escuderia con la que corrió."
-          - name: number
-            description: "Dorsal con el que corrió."
-          - name: grid
+          - name: season_year
+            description: "Temporada (año)."
+          - name: round
+            description: "Número de la carrera dentro de la temporada."
+          - name: driver_forename
+            description: "Nombre del piloto."
+          - name: driver_surname
+            description: "Apellido del piloto."
+          - name: driver_dob
+            description: "Fecha de nacimiento del piloto."
+          - name: driver_ref
+            description: "Nombre corto del piloto; identifica al piloto."
+          - name: driver_number
+            description: "Número permanente elegido por el piloto (sistema vigente desde 2014); el último usado si se ha retirado. Vacío en pilotos anteriores."
+          - name: driver_code
+            description: "Código de tres letras del piloto."
+          - name: driver_nationality
+            description: "Nacionalidad del piloto."
+          - name: driver_url
+            description: "Enlace de Wikipedia del piloto."
+          - name: quali_constructor_ref
+            description: "Nombre corto del equipo con el que se clasificó."
+          - name: quali_constructor_name
+            description: "Nombre del equipo con el que se clasificó."
+          - name: quali_constructor_nationality
+            description: "Nacionalidad del equipo con el que se clasificó."
+          - name: quali_constructor_url
+            description: "Enlace de Wikipedia del equipo con el que se clasificó."
+          - name: quali_car_number
+            description: "Dorsal con el que se clasificó."
+          - name: quali_position
+            description: "Posición final en la clasificación."
+          - name: q1
+            description: "Mejor tiempo en la Q1 (texto)."
+          - name: q2
+            description: "Mejor tiempo en la Q2 (texto); vacío si no pasó de la Q1."
+          - name: q3
+            description: "Mejor tiempo en la Q3 (texto); vacío si no pasó de la Q2."
+          - name: sprint_constructor_ref
+            description: "Nombre corto del equipo en el sprint; vacío si no hubo sprint."
+          - name: sprint_constructor_name
+            description: "Nombre del equipo en el sprint."
+          - name: sprint_constructor_nationality
+            description: "Nacionalidad del equipo en el sprint."
+          - name: sprint_constructor_url
+            description: "Enlace de Wikipedia del equipo en el sprint."
+          - name: sprint_car_number
+            description: "Dorsal en el sprint."
+          - name: sprint_grid
             description: "Posición de salida del sprint."
-          - name: position
+          - name: sprint_position
             description: "Posición final del sprint; vacía si no fue clasificado."
-          - name: positionText
-            description: "Posición como texto; una letra si no fue clasificado."
-          - name: positionOrder
-            description: "Orden final del sprint, incluyendo a los no clasificados."
-          - name: points
+          - name: sprint_position_text
+            description: "Posición del sprint como texto; una letra si no fue clasificado."
+          - name: sprint_position_order
+            description: "Orden final del sprint."
+          - name: sprint_points
             description: "Puntos del sprint."
-          - name: laps
-            description: "Vueltas completadas."
-          - name: time
-            description: "Tiempo total o diferencia con el ganador (texto)."
-          - name: milliseconds
-            description: "Tiempo total en milisegundos."
-          - name: fastestLap
-            description: "Número de la vuelta más rápida del piloto."
-          - name: fastestLapTime
-            description: "Tiempo de su vuelta más rápida (texto)."
-          - name: statusId
-            description: "Estado con el que terminó, referencia a status."
+          - name: sprint_laps
+            description: "Vueltas completadas en el sprint."
+          - name: sprint_time_text
+            description: "Tiempo total del sprint o diferencia con el ganador (texto)."
+          - name: sprint_time_ms
+            description: "Tiempo total del sprint en milisegundos."
+          - name: sprint_fastest_lap
+            description: "Número de su vuelta más rápida en el sprint."
+          - name: sprint_fastest_lap_time
+            description: "Tiempo de su vuelta más rápida en el sprint (texto)."
+          - name: sprint_status
+            description: "Estado con el que terminó el sprint (texto); se clasifica con el seed status_classification."
           - name: _loaded_at
             description: "Momento en que la fila llegó a Bronze; la rellena Snowflake al cargar."
