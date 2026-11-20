@@ -17,6 +17,141 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-20: Silver (7 modelos incrementales)
+**Qué hice:** creé la capa Silver en `models/silver/f1/` con 7 modelos
+incrementales (`merge`): 4 entidades (`slv_f1__circuits`, `slv_f1__races`,
+`slv_f1__drivers`, `slv_f1__constructors`) y 3 tablas de hechos
+(`slv_f1__results`, `slv_f1__qualifying`, `slv_f1__sprint_results`). Añadí la macro
+`time_to_ms` y, en `dbt_project.yml`, las `vars` `season_start: 2000` y
+`season_end: 2024`. `dbt build --select silver` pasa.
+Recuentos contrastados con los CSV de origen: 38 circuitos, 479 carreras,
+126 pilotos, 38 constructores, 10.079 resultados, 9.098 filas de clasificación
+(435 carreras) y 360 de sprint (18 carreras). Segunda ejecución sin
+duplicados.
+ 
+**Por qué lo hice así (y qué alternativas descarté):**
+- **Silver filtra 2000-2024 (y no solo Gold).** Antes de 2000 faltan por
+  completo la vuelta rápida, las horas de sesión y Q2/Q3 (100 % nulos), y la
+  clasificación solo existe desde 1994. Prioricé la calidad del dato sobre la
+  reutilización: mi caso de uso es el periodo moderno y no voy a usar años
+  anteriores. Descarté dejar todos los años en Silver y filtrar en Gold (más
+  reutilizable): quedan fuera 16.680 de 26.759 filas de resultados (62 %), y es
+  una renuncia consciente. Un matiz que comprobé: los nulos **no** son el motivo,
+  porque las columnas que usa mi método (parrilla, posición, estado, puntos,
+  vueltas) están completas en todas las épocas.
+- **El periodo vive en `vars`** y ningún modelo lleva el año escrito a mano.
+  Ampliar es cambiar un número.
+- **Incremental con `merge` y `unique_key`.** Los datos son estáticos, pero así
+  puedo añadir temporadas sin recalcular todo si me sobra tiempo, y es la
+  estrategia vista en clase. El filtro incremental usa `>=` y no `>`: reprocesa
+  la última temporada ya cargada por si hubiera correcciones, y el `merge`
+  actualiza en lugar de duplicar. En las entidades añadí `last_season_year`,
+  porque no tienen temporada propia y el modelo necesita saber hasta dónde está
+  cargado.
+- **Claves sustitutas `id_*` con `md5(concat_ws('|', ...))`.** Son
+  deterministas (el mismo dato da siempre la misma clave) y se calculan igual en
+  todos los modelos, así que se unen sin tablas de correspondencia. El separador
+  `|` evita choques al concatenar. Descarté secuencias o `uuid`, que cambiarían
+  entre ejecuciones.
+- **Entidades = una fila por piloto/constructor/circuito** con `row_number()`
+  (la fila más reciente) y no con `group by`: así la fila es real y completa, y no
+  una mezcla de valores de filas distintas.
+- **`drivers` y `constructors` salen solo de `results`.** Primero pensé en unir
+  resultados y clasificación; lo comprobé con los datos y la clasificación no
+  aporta ningún piloto (los 124 están dentro de los 126) ni ningún constructor
+  (38 en ambas) que no estén ya en resultados.
+- **Sin modelo de `status`.** La seed ya está limpia y es única por `status`; se
+  une directamente con `ref()`. Un modelo que solo la copiase no aportaría nada.
+- **`left join` y no `inner join` entre `results` y la seed de estados.**
+  Hoy dan el mismo resultado (los 139 estados casan y salen 10.079 filas), así que
+  la diferencia está en **cómo falla**. Con `inner join`, si algún día aparece un
+  estado nuevo o con otra ortografía, esas filas desaparecen de `results` sin
+  error ni aviso, y con ellas sus puntos y sus duelos (C1) y abandonos (C2): el
+  ranking cambiaría sin que nadie lo notase. Con `left join` la fila se conserva
+  con `status_category` nulo y un test `not_null` sobre esa columna (día 3) lo
+  detecta. Es la misma idea que `try_cast`: no perder datos en silencio, y
+  señalar el problema con un test. Lo mismo vale para `sprint_results`.
+- **`status_category` se calcula en Silver**, no en Gold: es normalización de
+  negocio que reutilizan C1, C2 y C3.
+- **`is_classified = position is not null`.** Es la posición oficial: solo la
+  tiene quien se clasifica. Coincide con el criterio de `positionText` numérico
+  salvo 2 filas de 2005 (ronda 1, Button y Sato); me quedo con `position`.
+- **`qualifying` y `sprint_results` son tablas separadas.** El sprint es otro
+  evento (más corto, otra escala de puntos, solo 18 fines de semana desde 2021) y
+  mezclarlo con la carrera falsearía puntos y vueltas. Ninguna fila de la
+  clasificación contiene solo sprint, así que separarlo no pierde nada.
+- **Tiempos de clasificación a milisegundos** (`q1_ms`, `q2_ms`, `q3_ms`) para
+  poder comparar y restar tiempos de compañeros. La conversión está en una
+  macro (`time_to_ms`) con `try_cast`: si un valor viene mal formado se convierte
+  en `NULL` en lugar de romper todo el `build`, y un test de calidad avisará si un
+  tiempo existente se pierde. Descarté el cast directo (`::int`), que falla con
+  vacío, `\N` o formato sin minutos y bloquea todos los modelos dependientes por
+  un solo valor.
+- **Silver más estrecho que staging:** sin columnas `*_url`, sin fechas y horas
+  de entrenamientos libres, sin vuelta rápida ni hora de sesiones. No intervienen
+  en ninguna métrica y siguen accesibles en staging.
+- **No relleno huecos.** Los nulos de Q2/Q3 y los 44 fines de semana sin
+  clasificación (2000-2002) son ausencias reales del origen; se documentan.
+**Cosas que aprendí de los datos:**
+- La clasificación de 2000-2024 cubre 435 de las 479 carreras. Faltan 4 de 17
+  en 2000, 1 de 17 en 2001 y 2 de 17 en 2002; desde 2003 está completa.
+- Hasta 2005 la clasificación era de una sola sesión: Q2 y Q3 son nulos. Desde
+  2006 hay tres rondas y Q3 solo lo disputan 10 pilotos (en torno a un 45-50 % de
+  nulos).
+- En 2000-2024 (temporada, ronda, piloto) es único en `results`, `qualifying` y
+  `sprint_results`: los duplicados que vi eran todos anteriores a 1979.
+- En `results`: `grid` 0 en 93 filas (salida desde el pit lane), `position` nulo
+  en 2.141 (no clasificados) y `race_time_ms` nulo en 5.376.
+- Los estados de `results` en 2000-2024 son 7.750 `finished`, 1.298 `mechanical`,
+  865 `driver_incident`, 158 `other_not_finished` y 8 `not_started`.
+- En cada `constructor_ref` hay un único nombre: Toro Rosso, AlphaTauri y RB son
+  constructores distintos, no el mismo con nombres cambiantes.
+- Los sprint: 360 filas en 18 carreras (3 en 2021, 3 en 2022, 6 en 2023, 6 en
+  2024), con 8 estados distintos y todos en la seed.
+- Al cambiar las columnas de un modelo incremental ya creado hay que ejecutar
+  `--full-refresh`: dbt no elimina columnas por sí solo.
+**Problemas encontrados y cómo los resolví:**
+- Mi primera idea para `drivers` y `constructors` (unir resultados y
+  clasificación) era innecesaria; la simplifiqué tras comprobar los datos.
+
+**Pendiente / siguiente paso:** tests (día 3): `unique` y `not_null` en los `id_*`,
+`relationships` entre hechos y entidades, `not_null` en `status_category`,
+cobertura 2000-2024 y el test de tiempos perdidos de `qualifying`. Después, Gold:
+tabla `int_` con los duelos entre compañeros apilados, C1, C2, C3, tabla de
+hechos por piloto y temporada, y el ranking. Por confirmar: que C1 cuente
+carrera, clasificación y sprint juntos (cada sesión disputada vale un duelo).
+ 
+### 2026-11-20: staging (3 modelos)
+**Qué hice:** creé `stg_f1__calendario`, `stg_f1__resultados` y
+`stg_f1__clasificacion` en `models/staging/f1/`, como vistas en
+`DEV_SILVER_DB`, schema `f1`. Cada una lee su tabla de Bronze con `source()` y
+la expone renombrada y con los tipos correctos. `dbt build --select staging`
+pasa. [Pendiente: `_f1__models.yml` con descripciones y tests, que va con el
+día 3.]
+ 
+**Por qué lo hice así (y qué alternativas descarté):**
+- **Staging 1:1 con Bronze**, solo renombrar y castear (patrón `source` /
+  `renamed`). La lógica de negocio va después, en Silver.
+- **`source()` solo en staging y `ref()` en el resto.** Así solo staging conoce
+  dónde está Bronze y, si cambia, se toca un único sitio.
+- **Vistas y no tablas:** staging no transforma el dato, no tiene sentido
+  guardarlo dos veces.
+- **Sin filtro de años en staging:** es 1:1; la ventana 2000-2024 la aplica
+  Silver.
+- **`try_to_time` y `try_cast`** para las horas y los números de coche: un valor
+  mal formado se convierte en `NULL` en lugar de romper el `build`. Descarté el
+  cast directo. Los nulos del origen ya llegan como `NULL` porque el
+  file format convierte `\N` y vacío.
+- **Unidades en el nombre** (`circuit_altitude_m`, `fastest_lap_speed_kmh`) y
+  `_loaded_at` renombrado a `date_load`, como en la guía.
+- **Sin tests todavía:** los tests son el tema del día 3 y los pondré todos
+  juntos en ese momento.
+**Problemas encontrados y cómo los resolví:** la vista previa del IDE daba
+"syntax error unexpected 'limit'": dbt v1 añade su propio `limit` a la vista
+previa, así que no hay que escribirlo.
+ 
+**Pendiente / siguiente paso:** Silver.
+
 ### 2026-11-19: cambio del origen a 3 ficheros planos
 **Qué hice:** sustituí los 8 CSV originales por tres ficheros planos
 (`calendario`, `resultados`, `clasificacion`) con todos los años (1950-2024).
@@ -61,8 +196,7 @@ derivados del dataset *Formula 1 World Championship (1950-2020)* de Rohan Rao.
 - Los nulos vienen marcados como `\N`; el formato de fichero de Snowflake los
   convierte a NULL.
 
-**Problemas encontrados:** [rellenar; por ejemplo, el seed tenía las columnas
-duplicadas al editar el YAML].
+**Problemas encontrados:** ninguno.
 
 **Pendiente / siguiente paso:** modelos de staging (`stg_f1__*`) y su
 configuración en `dbt_project.yml`; después, Silver.
@@ -216,7 +350,7 @@ proyecto:
 - 03: clones PRE_BRONZE_DB y PRO_BRONZE_DB a partir de DEV_BRONZE_DB, y permisos
   de lectura sobre bronze para cada rol de su entorno.
 Comprobé los recuentos (results 26759, etc.) y que DEV_TRANSFORM_ROLE puede leer
-bronze. [confirmar que cuadraron todos]
+bronze.
 
 **Por qué lo hice así (y qué alternativa descarté):**
 - Sigo la plantilla del curso y solo cambio lo propio de mi fuente.
@@ -285,6 +419,28 @@ el 03 para recrear los clones y los permisos.
 | Dos entornos (DEV y PRO), sin PRE | Los tres entornos del curso | Proyecto en solitario: PRE sería un paso intermedio sin otro equipo que valide; las databases PRE existen en Snowflake por la plantilla pero no se usan |
 | Rama de trabajo DEV, PR a main | Una rama por tarea | Un solo desarrollador; se conserva el pull request como punto de revisión antes de producción |
 | Seed con `status_id` como `integer` | `varchar` (el tipo de Bronze) | El join se hace contra los `stg_*`, donde los ids ya son enteros; el seed lleva el tipo final. Corregido tras la primera versión |
+| Staging 1:1 con Bronze, como vista | Poner lógica de negocio en staging | Staging solo renombra y castea; la lógica va en Silver |
+| `source()` solo en staging, `ref()` en el resto | `source()` repartido por varias capas | Un único punto que conoce Bronze |
+| `try_to_time` / `try_cast` en staging y en la macro `time_to_ms` | Cast directo (`::int`) | Un valor mal formado no rompe el `build`; un test de calidad avisa si se pierde un dato |
+| Silver filtra 2000-2024 | Silver con todos los años y filtro en Gold | Antes de 2000 faltan por completo vuelta rápida, horas de sesión y Q2/Q3 y la clasificación empieza en 1994. Calidad sobre reutilización: el caso de uso es el periodo moderno. Coste asumido: 62 % de las filas de resultados (16.680 de 26.759) |
+| Periodo 2000-2024 en `vars` | Años escritos en cada modelo | Un único punto de cambio; ampliar el periodo es cambiar un número |
+| Silver incremental con `merge` y `unique_key` | Tablas completas en cada ejecución | Permite añadir temporadas sin recalcular todo; estrategia vista en clase |
+| Filtro incremental con `>=` la última temporada | `>` | Reprocesa la última temporada por si hay correcciones; el `merge` actualiza y no duplica |
+| Claves `id_*` con `md5(concat_ws('\|', ...))` | Claves naturales, secuencias o `uuid` | Deterministas y homogéneas: se calculan igual en todos los modelos y se unen sin tablas de correspondencia |
+| Entidades con `row_number()` (fila más reciente) | `group by` con agregaciones | Devuelve una fila real y completa, sin mezclar valores de filas distintas |
+| `drivers` y `constructors` solo desde `results` | Unir resultados y clasificación | Verificado: clasificación y sprint no aportan ningún piloto ni constructor nuevo |
+| Sin modelo Silver de `status` | Modelo que copie la seed | La seed ya está limpia y es única; se une con `ref()` |
+| `left join` entre `results` y la seed de estados | `inner join` | Con `inner`, un estado nuevo o mal escrito haría desaparecer filas (puntos, duelos, abandonos) sin ningún aviso. Con `left` se conserva la fila con categoría nula y un test `not_null` lo detecta |
+| `status_category` calculada en Silver | Calcularla en Gold | Es normalización de negocio que reutilizan C1, C2 y C3 |
+| `is_classified = position is not null` | `positionText` numérico | Es la posición oficial; coincide salvo 2 filas de 2005 |
+| `qualifying` y `sprint_results` como tablas separadas | Una sola tabla de sesiones | El sprint es otro evento con otra escala de puntos; mezclarlo falsearía puntos y vueltas |
+| Tiempos de clasificación en milisegundos | Dejar el texto `m:ss.mmm` | El texto no se puede comparar ni restar; los milisegundos permiten calcular diferencias entre compañeros |
+| `try_cast` con test que avise | Que el `build` falle | Un valor ilegible no debe bloquear todos los modelos; el test lo señala para investigarlo |
+| Silver sin columnas `*_url`, sin entrenamientos libres ni vuelta rápida | Arrastrar todas las columnas | No intervienen en ninguna métrica; siguen en staging, así que no se pierde información |
+| No imputar huecos (44 carreras de 2000-2002 sin clasificación, Q2/Q3) | Rellenar con estimaciones | Son ausencias reales del origen; se documentan y se mide la cobertura en un test |
+| Staging sin tests hasta el día 3 | Tests desde el principio | Seguir la guía del curso; se añadirán todos juntos |
+| (Por confirmar) C1 cuenta duelos de carrera, clasificación y sprint juntos | Solo carrera; pesos por sesión | Cada duelo vale 1 y el peso de cada sesión sale de su frecuencia, sin inventar pesos |
+
 
 ## Errores y soluciones (rellenar según aparezcan)
 

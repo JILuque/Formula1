@@ -48,7 +48,7 @@ models:
     silver:
       +database: "{{ env_var('DBT_SILVER_DB') }}"
       f1:
-        +schema: 
+        +schema: f1
 
 
 
