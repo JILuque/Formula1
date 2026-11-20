@@ -35,7 +35,24 @@ clean-targets:         # directories to be removed by `dbt clean`
 # continue to be built as views. These settings can be overridden in the individual model files
 # using the `{{ config(...) }}` macro.
 
-#seeds
+### MODELS
+models:
+  f1:
+    # staging
+    staging:
+      +materialized: view
+      +database: "{{ env_var('DBT_SILVER_DB') }}"
+      f1:
+        +schema: f1
+    # silver
+    silver:
+      +database: "{{ env_var('DBT_SILVER_DB') }}"
+      f1:
+        +schema: 
+
+
+
+#### SEEDS
 seeds:
   f1:
     +database: "{{ env_var('DBT_SILVER_DB') }}"
@@ -46,13 +63,9 @@ seeds:
         status: varchar(100)
         status_category: varchar(30)
 
+### SNAPSHOTS
 
-
-# models
-models:
-  f1:
-    staging:
-      +materialized: view
-      +database: "{{ env_var('DBT_SILVER_DB') }}"
-      f1:
-        +schema: f1
+### VARS
+vars:
+  season_start: 2000
+  season_end: 2024
