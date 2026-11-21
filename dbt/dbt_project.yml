@@ -49,6 +49,17 @@ models:
       +database: "{{ env_var('DBT_SILVER_DB') }}"
       f1:
         +schema: f1
+    # gold
+    gold:
+      +database: "{{ env_var('DBT_GOLD_DB') }}"
+      intermediate:
+        +materialized: view
+        +schema: intermediate
+        int_f1__teammate_duels: 
+          +materialized: ephemeral
+      core:
+        +materialized: table
+        +schema: core
 
 
 
