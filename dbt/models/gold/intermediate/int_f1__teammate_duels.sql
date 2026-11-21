@@ -1,3 +1,11 @@
+------------------------------------------------------------------------------
+--Duelos entre compañeros de equipo (base de C1)
+--Empareja a cada piloto con su compañero en la misma carrera, sesión y equipo, y compara posiciones.
+--Cada duelo genera dos filas, una desde cada piloto (win_duel es verdadero para el que gana).
+--Excluye averías (mechanical) y no salidas (not_started) en carrera y sprint,
+--y los pilotos sin tiempo de Q1 en clasificación.
+-----------------------------------------------------------------------------
+
 {{ config(materialized='ephemeral') }}
 
 with race as (
