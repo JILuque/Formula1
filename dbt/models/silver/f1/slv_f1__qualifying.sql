@@ -13,10 +13,10 @@ with qualifying as (
 )
 
 select
-      md5(concat_ws('|', season_year, round, driver_ref))  as id_qualifying
-    , md5(concat_ws('|', season_year, round))              as id_race
-    , md5(driver_ref)                                      as id_driver
-    , md5(quali_constructor_ref)                           as id_constructor
+      {{ dbt_utils.generate_surrogate_key(['season_year', 'round', 'driver_ref']) }} as id_qualifying
+    , {{ dbt_utils.generate_surrogate_key(['season_year', 'round']) }} as id_race
+    , {{ dbt_utils.generate_surrogate_key(['driver_ref']) }} as id_driver
+    , {{ dbt_utils.generate_surrogate_key(['quali_constructor_ref']) }} as id_constructor
     , season_year
     , round
     , quali_car_number                                     as car_number

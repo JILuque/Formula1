@@ -18,10 +18,10 @@ status as (
 )
 
 select
-      md5(concat_ws('|', sp.season_year, sp.round, sp.driver_ref)) as id_sprint_result
-    , md5(concat_ws('|', sp.season_year, sp.round))                as id_race
-    , md5(sp.driver_ref)                                           as id_driver
-    , md5(sp.sprint_constructor_ref)                               as id_constructor
+      {{ dbt_utils.generate_surrogate_key(['sp.season_year', 'sp.round', 'sp.driver_ref']) }} as id_sprint_result
+    , {{ dbt_utils.generate_surrogate_key(['sp.season_year', 'sp.round']) }} as id_race
+    , {{ dbt_utils.generate_surrogate_key(['sp.driver_ref']) }} as id_driver
+    , {{ dbt_utils.generate_surrogate_key(['sp.sprint_constructor_ref']) }} as id_constructor
     , sp.season_year
     , sp.round
     , sp.sprint_car_number                                         as car_number

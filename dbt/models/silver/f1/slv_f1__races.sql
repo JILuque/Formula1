@@ -13,12 +13,12 @@ with calendar as (
 )
 
 select
-      md5(concat_ws('|', season_year, round)) as id_race
+      {{ dbt_utils.generate_surrogate_key(['season_year', 'round']) }} as id_race
     , season_year
     , round
     , race_name
     , race_date
     , sprint_date is not null as has_sprint
-    , md5(circuit_ref) as id_circuit
+    , {{ dbt_utils.generate_surrogate_key(['circuit_ref']) }} as id_circuit
     , circuit_ref
 from calendar

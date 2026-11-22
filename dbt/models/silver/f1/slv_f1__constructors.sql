@@ -26,7 +26,7 @@ latest as (
 )
 
 select
-      md5(constructor_ref) as id_constructor
+      {{ dbt_utils.generate_surrogate_key(['constructor_ref']) }} as id_constructor
     , constructor_ref
     , constructor_name
     , constructor_nationality

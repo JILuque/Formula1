@@ -17,10 +17,10 @@ status as (
 )
 
 select
-      md5(concat_ws('|', r.season_year, r.round, r.driver_ref)) as id_result
-    , md5(concat_ws('|', r.season_year, r.round))               as id_race
-    , md5(r.driver_ref)                                          as id_driver
-    , md5(r.constructor_ref)                                     as id_constructor
+      {{ dbt_utils.generate_surrogate_key(['r.season_year', 'r.round', 'r.driver_ref']) }} as id_result
+    , {{ dbt_utils.generate_surrogate_key(['r.season_year', 'r.round']) }} as id_race
+    , {{ dbt_utils.generate_surrogate_key(['r.driver_ref']) }} as id_driver
+    , {{ dbt_utils.generate_surrogate_key(['r.constructor_ref']) }} as id_constructor
     , r.season_year
     , r.round
     , r.car_number
