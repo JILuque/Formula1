@@ -17,6 +17,232 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-22: fct_driver_season y ranking
+**Qué hice:** creé `fct_driver_season` en `models/gold/core/` (tabla, una fila por
+piloto y temporada) y la consulta `analyses/ranking.sql`. La tabla reúne C1, C2 y
+C3: parte de C2 (una fila por piloto que tomó la salida, 598) y le une C1 y C3
+con `left join`. Calcula los z-scores de cada componente dentro de cada
+temporada y el score final, `(z_c1 - z_c2 + z_c3) / 3`. `dbt build` pasa y las
+cifras cuadran: 598 filas, 498 de ellas con muestra fiable y score.
+El ranking agrega esas temporadas por piloto con una media ponderada por
+carreras y exige un mínimo de 100 carreras. Resultado (top 10): Alonso 0,85,
+Max Verstappen 0,82, Hamilton 0,53, Vettel 0,50, Gasly 0,47, Russell 0,46,
+Norris 0,41, Rosberg 0,39, Button 0,34 y Ricciardo 0,32.
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- **z-score dentro de cada temporada.** C1 es un porcentaje, C2 una tasa
+  pequeña y C3 son posiciones: no se pueden sumar tal cual, y C3 se comería a las
+  otras dos. Restar la media y dividir por la desviación de la temporada las
+  pone en la misma unidad ("pasos típicos sobre la media de su año"), de modo
+  que cada componente pesa de verdad un tercio. Descarté sumar los valores
+  brutos. Coste asumido: el z-score es relativo, no dice que un piloto sea
+  objetivamente bueno, solo que destaca frente a los de su temporada.
+- **C2 resta en el score.** Es una tasa de incidentes: más es peor. El z-score
+  de C2 no se invierte en su cálculo, el signo se aplica en la fórmula final.
+- **Muestra fiable: al menos 8 carreras válidas y al menos 10 duelos**
+  (`is_reliable_sample`). Los z-scores se calculan solo con esas filas; sin
+  esto, un piloto con una carrera distorsiona la media y la desviación de la
+  temporada. Los umbrales son una decisión mía (aproximadamente el mínimo para
+  que una media por temporada diga algo) y se cambian en una sola línea. Quedan
+  498 de 598 filas con score; el resto tiene `score` nulo, no cero.
+- **C2 como base y `left join` de C1 y C3.** Hay 598 pilotos-temporada en C2,
+  597 en C1 y 594 en C3. Los que faltan tienen una o dos carreras (en C3,
+  todas por avería; en C1, ningún duelo válido) y nunca llegan a ser fiables.
+- **Pesos exactos de 1/3**, como se decidió; los pesos con `vars` siguen siendo
+  una mejora opcional.
+- **El ranking es una consulta, no una tabla.** Lo que se pide es un top 5/10
+  con un filtro de mínimo, y eso es una `select ... order by ... limit`. Ni
+  `fct_` (no es un hecho) ni `dim_` (no describe una entidad). Una tabla
+  `agg_driver_career` (una fila por piloto con el score medio, las carreras y un
+  indicador de mínimo) encajaría en Gold y quedaría como mejora opcional.
+- **Media ponderada por carreras** y no media simple de temporadas: una
+  temporada de 20 carreras debe pesar más que una de 8.
+- **Mínimo de 100 carreras (unas cinco temporadas) en vez de 36.** Con 36
+  ("temporada y media") entraba Albers, con dos temporadas fiables y 37 carreras,
+  en el tercer puesto por delante de Hamilton. Es un efecto de muestra pequeña
+  (compañeros flojos y un coche de la cola donde unas pocas buenas carreras
+  suman mucho). Con 100 desaparece. El mínimo de 36 se conserva como análisis
+  de sensibilidad.
+
+**Problemas encontrados y cómo los resolví:**
+- **Primera versión de C3 con sesgo.** El puesto esperado era `2 * puesto - 0,5`.
+  Con esa fórmula, los pilotos de equipos de la cola salían inflados (casi todo
+  el que termina queda por delante de 19,5) y los de coches de arriba no podían
+  destacar (el máximo era +0,5). Aparecían Pic, Albers y Nasr arriba y Hamilton
+  y Vettel fuera del top 10. Lo sustituí por la media real de puesto final de
+  los coches de ese puesto de constructor (por ejemplo, el 1.º acaba de media
+  en el 3,73 y el 4.º en el 8,39). Después comprobé que el C3 medio por nivel
+  de coche queda en torno a 0 (entre -0,12 y +0,07).
+- **Empates en el campeonato de constructores.** Con `row_number()` y desempate
+  por `id_constructor`, los equipos empatados a 0 puntos y 0 victorias quedaban
+  ordenados de forma arbitraria. Lo vi al contrastar mi `fct` con una
+  reproducción independiente del cálculo con los CSV: un piloto (Albers) salía con
+  scores distintos. Al revisarlo, hay 8 temporadas con equipos empatados a 0
+  puntos (2000, 2006, 2008, 2010, 2011, 2012, 2013 y 2014) además de otros
+  empates (2000, 2002 y 2022). Pasé a `rank()` con orden por puntos y
+  victorias: los empatados comparten puesto y el resultado ya no depende de un
+  orden inventado. `dense_rank()` lo descarté porque junta niveles de coche
+  distintos. Antes de este cambio, mi comprobación de empates solo había mirado
+  los de más de 0 puntos.
+
+**Limitaciones conocidas (para la defensa):**
+- **C1 no pondera la calidad del compañero.** Ganar un duelo a un compañero
+  flojo vale lo mismo que ganárselo a un campeón. Ejemplo: Norris en 2021 y 2022
+  contra Ricciardo en su peor etapa. La solución (un modelo de ratings que conecte
+  a todos los pilotos, tipo Elo o Bradley-Terry) queda como trabajo futuro; una
+  versión más sencilla, ponderar cada duelo por el C3 del rival, añadiría una
+  cadena `int -> int` y unos pesos arbitrarios, y no la he hecho.
+- **Los coches de arriba tienen un techo bajo en C3.** En 2024 McLaren fue el
+  primero del campeonato y Norris sale con un C3 negativo.
+- **La ventana 2000-2024 recorta carreras.** Michael Schumacher solo suma 180
+  carreras (incluida su vuelta a Mercedes) y sale 13.º con 0,25.
+- **El score mide rendimiento relativo a su coche y su compañero**, no el mejor
+  piloto de la historia. El top 2 (Alonso y Max Verstappen) es estable ante
+  cualquier tratamiento de los empates; a partir del tercero el orden depende
+  de las decisiones de diseño. Gasly sube por tres temporadas con AlphaTauri
+  (2020-2022) con C3 entre +1,6 y +2,7.
+
+**Pendiente / siguiente paso:** tests (día 3) de Silver y Gold; dimensiones
+(`dim_driver`, `dim_constructor`...) y la tabla de hechos piloto-carrera
+(`fct_driver_race`), con un `gold_results__enriched` como modelo ancho previo;
+contraste entre el ranking en bruto y el ajustado por coche; modelos físicos
+de cada capa; pull request de DEV a main y despliegue en PRO. Opcional:
+`agg_driver_career`, Power BI.
+
+---
+
+### 2026-11-21: Gold intermedio (duelos, C1, C2 y C3)
+**Qué hice:** creé la capa Gold intermedia en `models/gold/intermediate/` con
+cuatro modelos y añadí el bloque `gold` a `dbt_project.yml` (base de datos
+`DBT_GOLD_DB`; `intermediate` como vista en el schema `intermediate` y `core`
+como tabla en el schema `core`):
+- `int_f1__teammate_duels`: duelos entre compañeros, apilados. Es `ephemeral`.
+- `int_f1__driver_season_c1`: porcentaje de duelos ganados por piloto y temporada.
+- `int_f1__driver_season_c2`: tasa de incidentes del piloto por carrera disputada.
+- `int_f1__driver_season_c3`: rendimiento frente al nivel del coche.
+Cifras contrastadas con los CSV: 16.978 filas de duelos (8.489 duelos, cada uno
+con una fila desde cada piloto: 3.896 de carrera, 4.417 de clasificación y 176
+de sprint); C1 con 597 filas; C2 con 598 filas (10.071 carreras y 865 incidentes);
+C3 con 594 filas (8.773 carreras válidas).
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- **Duelos con un `join` del modelo consigo mismo.** Para cada sesión, se une
+  cada piloto con los demás del mismo equipo en la misma carrera (`a.id_driver <>
+  b.id_driver`), y `win_duel` es verdadero si el piloto A queda por delante.
+  Cada duelo genera dos filas. Está separado de C1 porque la misma tabla de duelos
+  sirve para cualquier análisis de compañeros, y C1 solo agrega.
+- **`int_f1__teammate_duels` es `ephemeral`**, a sugerencia del profesorado, que
+  considera poco limpio que un `int` lea de otro `int`. No crea objeto en
+  Snowflake; sigue apareciendo en el linaje; no se puede testear por separado.
+  La alternativa, juntar duelos y C1 en un solo modelo, la descarté porque
+  mezcla dos responsabilidades.
+- **Los duelos reúnen carrera, clasificación y sprint** (cada sesión disputada
+  vale un duelo). Decisión confirmada: el peso de cada sesión sale de cuántas
+  veces se disputa, sin inventar pesos. Consecuencia asumida: la clasificación pesa
+  algo más que la carrera (4.417 duelos frente a 3.896). Descarté pesos por
+  sesión, que serían arbitrarios.
+- **Opción A en los duelos.** Se excluyen los duelos en los que alguno de los dos
+  tiene estado `mechanical` o `not_started` (carrera y sprint), y los de
+  clasificación sin tiempo de Q1. Se pierden 1.141 filas de duelo de carrera
+  (1.136 por avería y 5 por no salir) y 120 de clasificación.
+- **C2 cuenta los incidentes sobre todas las carreras que el piloto tomó la
+  salida**, incluidas las que acabó por avería: la avería no es incidente, pero
+  sí una carrera disputada (el denominador es la exposición). Solo se excluye
+  `not_started`. Así, la opción A se aplica a C1 y C3, no a C2, que ya separa
+  los abandonos por avería de los que son culpa del piloto.
+- **C3: nivel del coche = puesto del constructor en el campeonato de esa
+  temporada**, calculado una vez por temporada. El puesto se obtiene sumando
+  puntos de carrera y de sprint de `results` y `sprint_results`, que reproduce
+  el campeonato real: sin sprint, McLaren y Aston Martin empataban a 266 puntos
+  en 2023; con él, McLaren es 4.º. En total cambian 6 puestos (2022 y 2023).
+  Descarté medir el nivel del coche carrera a carrera (más complejo) y usar las
+  posiciones de parrilla.
+- **El puesto del constructor es una CTE dentro de C3**, no una tabla de Silver.
+  Se barajó una tabla `slv_f1__constructor_standings` (une dos tablas de
+  Silver y daría una rama más al linaje) y un modelo ancho `gold_results__enriched`
+  que lo calculase; ambas descartadas porque hoy solo lo usa C3 y no aportaban
+  más que linaje. El `enriched` queda para alimentar a `fct_driver_race`, como
+  en el ejercicio del curso, sin el puesto del constructor para no duplicar
+  el cálculo.
+- **C3 lee directamente de Silver**, para no encadenar un `int` tras otro.
+- **Puesto esperado y desempates**: véase la entrada del 2026-11-22.
+- **Opción A en C3:** se excluyen las carreras con estado `mechanical` o
+  `not_started`; se mantienen `driver_incident` y `other_not_finished`.
+
+**Problemas encontrados y cómo los resolví:**
+- Al lanzar la consulta de comprobación con `ref()` en Snowsight dio error de sintaxis:
+  `ref()` solo se renderiza en dbt. Se ejecuta con Preview en el IDE o desde
+  `analyses/`.
+- `Object ... does not exist or not authorized` sobre C3: no era un problema de
+  permisos, el modelo aún no se había construido. Hay que ejecutar `dbt build`
+  del modelo antes de consultarlo.
+- Dudaba de que 1.141 duelos anulados fuera correcto: eran 1.136 por avería y 5
+  por no salir, sin doble recuento.
+
+**Cosas que aprendí de los datos:**
+- Hay 80 pilotos-temporada con menos de 10 duelos (C1) y 47 con menos de 5
+  carreras (C2): son muestras pequeñas, que se tratan en el `fct` con el
+  indicador de muestra fiable.
+- Hay un piloto-temporada (Zonta 2001) que está en C2 y C3 pero no en C1, y 4
+  que están en C1 y C2 pero no en C3 (todas sus carreras fueron por avería).
+- Entre 2000 y 2002 la clasificación está incompleta (44 fines de semana sin
+  ella), así que C1 usa solo carrera en esos años.
+
+**Pendiente / siguiente paso:** `fct_driver_season` y el ranking.
+
+---
+
+### 2026-11-20: demostración de la incrementalidad con tasks de Snowflake y macros
+**Qué hice:** para enseñar en la defensa que Silver es incremental y no duplica,
+preparé dos CSV de prueba (`calendario_test.csv`, con una carrera de 2025, ronda
+99, "TEST Incremental Grand Prix", y `resultados_test.csv`, con dos resultados de
+pilotos de prueba), subidos al stage interno `carga_bronze`. En Snowflake creé dos
+tasks sin programación (`task_demo_cargar`, que hace los `COPY INTO` a Bronze, y
+`task_demo_limpiar`, que borra las filas de 2025 ronda 99) y en dbt tres macros:
+- `insertar_incremental`: lanza la task de carga, espera 10 segundos y comprueba
+  que hay 3 registros de 2025 en Bronze.
+- `ver_2025`: lista lo que hay de 2025 en Silver (esperado: 7 filas, 1 carrera,
+  1 circuito, 2 pilotos, 1 constructor y 2 resultados).
+- `limpiar_incremental`: lanza la task de limpieza y comprueba que no queda nada
+  de 2025 en Bronze.
+Flujo de la demo: `dbt run-operation insertar_incremental`, `dbt run --select
+silver`, `dbt run-operation ver_2025` y, al terminar, `dbt run-operation
+limpiar_incremental`. La incrementalidad funciona: se añaden las filas de 2025
+sin duplicar nada.
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- **CSV de prueba y no una macro que inserte una fila a mano:** simula una carga
+  real (fichero, `COPY INTO`, dbt) y no toca el código de los modelos.
+- **Tasks de Snowflake y no procedimientos:** son lo visto en clase. Cada task
+  se ejecuta a mano con `execute task`, sin programación.
+- **Sin job en PRO:** es una demo, no debe ejecutarse sola.
+- **Cargar y limpiar son dos macros separadas**, y no una que borre antes de
+  insertar: si la carga borrase siempre lo anterior, nunca se vería un duplicado
+  aunque el modelo fallase.
+- **Comprobación previa en `insertar_incremental`:** si ya hay registros de 2025,
+  la macro se detiene antes de cargar. Sin ella, ejecutarla dos veces duplicaba
+  las filas en Bronze.
+- **Código lo más simple posible:** simplifiqué una primera versión que esperaba a
+  la task con un bucle, porque no se entendía; ahora espera 10 segundos y cuenta.
+
+**Problemas encontrados y cómo los resolví:**
+- La task falló por permisos: se ejecuta con los privilegios del propietario
+  (SYSADMIN) y el stage era de ACCOUNTADMIN. Se resolvió dando lectura y escritura
+  sobre el stage y uso del formato de fichero a SYSADMIN, y `operate` sobre las
+  tasks al rol de dbt. Los errores de una task no se ven en Snowsight: hay que
+  consultar `information_schema.task_history`.
+- El `COPY INTO` ignora ficheros ya cargados: la task usa `force = true`.
+- Al ejecutar dos veces la macro, Bronze quedaba con 6 registros y no 3: se
+  añadió la comprobación previa.
+- La macro usaba `bd` antes de definirla: la definición debe ir primero.
+- Los registros de prueba **siguen en Silver tras limpiar Bronze**, porque el
+  `merge` no borra: para eliminarlos hay que ejecutar `dbt run --select silver
+  --full-refresh`.
+
+**Pendiente / siguiente paso:** ninguno propio; la demo queda lista para la defensa.
+
+---
+
 ### 2026-11-20: Silver (7 modelos incrementales)
 **Qué hice:** creé la capa Silver en `models/silver/f1/` con 7 modelos
 incrementales (`merge`): 4 entidades (`slv_f1__circuits`, `slv_f1__races`,
@@ -405,9 +631,9 @@ el 03 para recrear los clones y los permisos.
 | Score compuesto C1, C2, C3 | Solo compañero; ELO | Cada componente ataca un aspecto distinto del efecto coche |
 | Seed para clasificar `status` | `CASE` en el SQL | Revisable y discutible sin tocar código |
 | Pesos fijos de 1/3 | `vars` con sensibilidad | Punto de partida neutro; `vars` si hay tiempo |
-| Mínimo de 36 carreras con columna de marca | Sin filtro; 5 o 24 carreras | Evita que una sola temporada brillante entre en el top |
+| Mínimo de carreras para entrar en el ranking: 100 (36 en el diseño inicial, como sensibilidad) | Sin filtro; 36 | Con 36 entraba un piloto de dos temporadas en un equipo de la cola (Albers, 3.º); con 100 (unas cinco temporadas) desaparece |
 | Carga manual a stage interno | Cargar desde GitHub | Datos estáticos; sin integraciones innecesarias |
-| Periodo 2000-2024 | Otro rango | Justificación por redactar |
+| Periodo 2000-2024 | Otro rango | Antes de 2000 faltan datos de sesión y la clasificación empieza en 1994 (véase "Silver filtra 2000-2024") |
 | Schema de bronze llamado f1 | kaggle_f1 (nombre de la fuente) | Describe el contenido, no el origen |
 | Sin columnas _fivetran_*; _loaded_at sí | Copiar las columnas de la plantilla | La fuente es un CSV de Kaggle; _loaded_at permite el freshness |
 | Ids y tiempos en varchar en bronze | Tipar todo en bronze | Convención de la plantilla; tipos definitivos en staging |
@@ -439,7 +665,21 @@ el 03 para recrear los clones y los permisos.
 | Silver sin columnas `*_url`, sin entrenamientos libres ni vuelta rápida | Arrastrar todas las columnas | No intervienen en ninguna métrica; siguen en staging, así que no se pierde información |
 | No imputar huecos (44 carreras de 2000-2002 sin clasificación, Q2/Q3) | Rellenar con estimaciones | Son ausencias reales del origen; se documentan y se mide la cobertura en un test |
 | Staging sin tests hasta el día 3 | Tests desde el principio | Seguir la guía del curso; se añadirán todos juntos |
-| (Por confirmar) C1 cuenta duelos de carrera, clasificación y sprint juntos | Solo carrera; pesos por sesión | Cada duelo vale 1 y el peso de cada sesión sale de su frecuencia, sin inventar pesos |
+| C1 cuenta duelos de carrera, clasificación y sprint juntos | Solo carrera; pesos por sesión | Cada duelo vale 1 y el peso de cada sesión sale de su frecuencia, sin inventar pesos. La clasificación pesa algo más (4.417 duelos frente a 3.896 de carrera) |
+| Demo del incremental con tasks de Snowflake y macros | Job de dbt en PRO; procedimientos; una macro que borre y cargue | Son lo visto en clase; no se ejecuta sola; limpiar va aparte para que un duplicado se vea |
+| Duelos entre compañeros en un modelo aparte, `ephemeral` | Duelos y C1 en un solo modelo; dos `int` consecutivos materializados | El profesorado desaconseja un `int` leyendo otro `int`; el ephemeral no crea objeto, aunque sigue en el linaje y no se puede testear |
+| Los duelos incluyen carrera, clasificación y sprint | Solo carrera; pesos por sesión | Cada duelo vale 1, sin pesos inventados |
+| C2 usa todas las carreras con salida (solo excluye `not_started`) | Excluir también `mechanical` (opción A) | La avería no es incidente, pero sí carrera disputada: es el denominador de la tasa |
+| Nivel del coche = puesto del constructor con puntos de carrera + sprint | Solo carreras; nivel carrera a carrera | Reproduce el campeonato real (2023: McLaren 4.º) y se calcula una vez por temporada |
+| Puesto esperado = media real de puesto final de ese nivel de coche | `2 * puesto - 0,5` | La fórmula fija inflaba a los equipos de la cola y no dejaba destacar a los de arriba; la media real deja el C3 medio en torno a 0 |
+| `rank()` para el puesto del constructor | `row_number()` con desempate por id; `dense_rank()` | Los equipos empatados comparten puesto, sin orden arbitrario; `dense_rank` junta niveles distintos |
+| Puesto del constructor como CTE dentro de C3 | Tabla en Silver; `gold_results__enriched` | Solo lo usa C3; evita un `int -> int` y un cálculo duplicado |
+| z-score por temporada para C1, C2 y C3 | Sumar los valores brutos | Pone las tres en la misma unidad; el peso de 1/3 es real |
+| C2 resta en la fórmula del score | Invertir el z-score de C2 al calcularlo | Es una tasa de incidentes: más es peor |
+| Muestra fiable: 8 carreras válidas y 10 duelos | Todas las filas | Evita que un piloto con una carrera distorsione la media y la desviación; umbrales ajustables |
+| `fct_driver_season` con C2 como base y `left join` | `full outer join`; `inner join` | C2 tiene una fila por piloto que tomó la salida; los que faltan en C1 o C3 no son fiables |
+| Ranking como consulta (`analyses`), media ponderada por carreras | Tabla `ranking`; media simple | El top es un filtro; una temporada larga debe pesar más que una corta |
+| C1 sin ponderar por la calidad del compañero | Ponderar por el C3 del rival; ratings tipo Elo | Fuera del alcance en el plazo; se documenta como limitación y trabajo futuro |
 
 
 ## Errores y soluciones (rellenar según aparezcan)
