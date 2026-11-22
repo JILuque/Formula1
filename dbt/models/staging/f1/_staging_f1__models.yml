@@ -1,195 +1,251 @@
 version: 2
-
 models:
-
-  - name: stg_f1__calendario
-    description: "Calendario de carreras de Bronze, uno a uno: renombra y convierte tipos. Una fila por gran premio (1950-2024), con los datos del circuito incluidos."
-    columns:
-      - name: season_year
-        description: "Año de la temporada."
-      - name: round
-        description: "Número de ronda dentro de la temporada."
-      - name: race_name
-        description: "Nombre del gran premio."
-      - name: race_date
-        description: "Fecha de la carrera."
-      - name: race_time
-        description: "Hora de la carrera. Nulo si no consta o está mal formada."
-      - name: race_url
-        description: "Enlace de Wikipedia de la carrera."
-      - name: fp1_date
-        description: "Fecha de la primera sesión de entrenamientos libres."
-      - name: fp1_time
-        description: "Hora de la primera sesión de entrenamientos libres."
-      - name: fp2_date
-        description: "Fecha de la segunda sesión de entrenamientos libres."
-      - name: fp2_time
-        description: "Hora de la segunda sesión de entrenamientos libres."
-      - name: fp3_date
-        description: "Fecha de la tercera sesión de entrenamientos libres."
-      - name: fp3_time
-        description: "Hora de la tercera sesión de entrenamientos libres."
-      - name: quali_date
-        description: "Fecha de la clasificación."
-      - name: quali_time
-        description: "Hora de la clasificación."
-      - name: sprint_date
-        description: "Fecha de la carrera sprint. Nulo si no hubo."
-      - name: sprint_time
-        description: "Hora de la carrera sprint."
-      - name: circuit_ref
-        description: "Referencia corta del circuito en el origen."
-      - name: circuit_name
-        description: "Nombre del circuito."
-      - name: circuit_location
-        description: "Localidad del circuito."
-      - name: circuit_country
-        description: "País del circuito."
-      - name: circuit_lat
-        description: "Latitud del circuito."
-      - name: circuit_lng
-        description: "Longitud del circuito."
-      - name: circuit_altitude_m
-        description: "Altitud del circuito en metros."
-      - name: circuit_url
-        description: "Enlace de Wikipedia del circuito."
-      - name: date_load
-        description: "Fecha y hora de carga del registro en Bronze."
-
-  - name: stg_f1__resultados
-    description: "Resultados de carrera de Bronze, uno a uno: renombra y convierte tipos. Una fila por piloto y carrera (1950-2024), con los datos del piloto y del constructor incluidos."
-    columns:
-      - name: season_year
-        description: "Año de la temporada."
-      - name: round
-        description: "Número de ronda dentro de la temporada."
-      - name: driver_forename
-        description: "Nombre del piloto."
-      - name: driver_surname
-        description: "Apellido del piloto."
-      - name: driver_dob
-        description: "Fecha de nacimiento del piloto."
-      - name: driver_ref
-        description: "Referencia corta del piloto en el origen."
-      - name: driver_number
-        description: "Número permanente del piloto. Nulo si no tiene."
-      - name: driver_code
-        description: "Código de tres letras del piloto. Nulo si no tiene."
-      - name: driver_nationality
-        description: "Nacionalidad del piloto."
-      - name: driver_url
-        description: "Enlace de Wikipedia del piloto."
-      - name: constructor_ref
-        description: "Referencia corta del constructor en el origen."
-      - name: constructor_name
-        description: "Nombre del constructor."
-      - name: constructor_nationality
-        description: "Nacionalidad del constructor."
-      - name: constructor_url
-        description: "Enlace de Wikipedia del constructor."
-      - name: car_number
-        description: "Número de coche en la carrera. Nulo si no consta."
-      - name: grid
-        description: "Posición de salida. 0 si salió desde el pit lane."
-      - name: position
-        description: "Posición oficial. Nulo si no fue clasificado."
-      - name: position_text
-        description: "Posición en texto (número o letra del estado)."
-      - name: position_order
-        description: "Orden final, definido también para los que no terminaron."
-      - name: points
-        description: "Puntos obtenidos."
-      - name: laps
-        description: "Vueltas completadas."
-      - name: race_time_text
-        description: "Tiempo de carrera en texto."
-      - name: race_time_ms
-        description: "Tiempo de carrera en milisegundos. Nulo si no lo tiene."
-      - name: fastest_lap
-        description: "Vuelta en la que hizo su vuelta rápida."
-      - name: fastest_lap_rank
-        description: "Puesto de su vuelta rápida entre todos los pilotos."
-      - name: fastest_lap_time
-        description: "Tiempo de su vuelta rápida."
-      - name: fastest_lap_speed_kmh
-        description: "Velocidad media de su vuelta rápida en km/h."
-      - name: status
-        description: "Estado final en texto (por ejemplo Finished o Engine)."
-      - name: date_load
-        description: "Fecha y hora de carga del registro en Bronze."
-
-  - name: stg_f1__clasificacion
-    description: "Clasificación y sprint de Bronze, uno a uno: renombra y convierte tipos. Una fila por piloto y carrera (1994-2024). Las columnas sprint_* están vacías cuando no hubo sprint."
-    columns:
-      - name: season_year
-        description: "Año de la temporada."
-      - name: round
-        description: "Número de ronda dentro de la temporada."
-      - name: driver_forename
-        description: "Nombre del piloto."
-      - name: driver_surname
-        description: "Apellido del piloto."
-      - name: driver_dob
-        description: "Fecha de nacimiento del piloto."
-      - name: driver_ref
-        description: "Referencia corta del piloto en el origen."
-      - name: driver_number
-        description: "Número permanente del piloto. Nulo si no tiene."
-      - name: driver_code
-        description: "Código de tres letras del piloto. Nulo si no tiene."
-      - name: driver_nationality
-        description: "Nacionalidad del piloto."
-      - name: driver_url
-        description: "Enlace de Wikipedia del piloto."
-      - name: quali_constructor_ref
-        description: "Referencia del constructor con el que clasificó."
-      - name: quali_constructor_name
-        description: "Nombre del constructor con el que clasificó."
-      - name: quali_constructor_nationality
-        description: "Nacionalidad del constructor con el que clasificó."
-      - name: quali_constructor_url
-        description: "Enlace de Wikipedia de ese constructor."
-      - name: quali_car_number
-        description: "Número de coche en la clasificación."
-      - name: quali_position
-        description: "Posición en la clasificación."
-      - name: q1
-        description: "Mejor tiempo de la Q1 en texto m:ss.mmm."
-      - name: q2
-        description: "Mejor tiempo de la Q2 en texto. Nulo antes de 2006 o si no la disputó."
-      - name: q3
-        description: "Mejor tiempo de la Q3 en texto. Nulo antes de 2006 o si no la disputó."
-      - name: sprint_constructor_ref
-        description: "Referencia del constructor en el sprint. Nulo si no hubo sprint."
-      - name: sprint_constructor_name
-        description: "Nombre del constructor en el sprint."
-      - name: sprint_constructor_nationality
-        description: "Nacionalidad del constructor en el sprint."
-      - name: sprint_constructor_url
-        description: "Enlace de Wikipedia de ese constructor."
-      - name: sprint_car_number
-        description: "Número de coche en el sprint."
-      - name: sprint_grid
-        description: "Posición de salida en el sprint."
-      - name: sprint_position
-        description: "Posición oficial en el sprint."
-      - name: sprint_position_text
-        description: "Posición en el sprint en texto."
-      - name: sprint_position_order
-        description: "Orden final en el sprint."
-      - name: sprint_points
-        description: "Puntos del sprint."
-      - name: sprint_laps
-        description: "Vueltas del sprint."
-      - name: sprint_time_text
-        description: "Tiempo del sprint en texto."
-      - name: sprint_time_ms
-        description: "Tiempo del sprint en milisegundos."
-      - name: sprint_fastest_lap
-        description: "Vuelta rápida del sprint."
-      - name: sprint_fastest_lap_time
-        description: "Tiempo de la vuelta rápida del sprint."
-      - name: sprint_status
-        description: "Estado final en el sprint en texto."
-      - name: date_load
-        description: "Fecha y hora de carga del registro en Bronze."
+- name: stg_f1__calendario
+  description: "Calendario de carreras de Bronze, uno a uno: renombra y convierte tipos. Una fila por gran premio (1950-2024), con los datos del circuito incluidos."
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - season_year
+        - round
+  columns:
+  - name: season_year
+    description: "Año de la temporada."
+    data_tests:
+    - not_null
+  - name: round
+    description: "Número de ronda dentro de la temporada."
+    data_tests:
+    - not_null
+  - name: race_name
+    description: "Nombre del gran premio."
+    data_tests:
+    - not_null
+  - name: race_date
+    description: "Fecha de la carrera."
+    data_tests:
+    - not_null
+  - name: race_time
+    description: "Hora de la carrera. Nulo si no consta o está mal formada."
+  - name: race_url
+    description: "Enlace de Wikipedia de la carrera."
+  - name: fp1_date
+    description: "Fecha de la primera sesión de entrenamientos libres."
+  - name: fp1_time
+    description: "Hora de la primera sesión de entrenamientos libres."
+  - name: fp2_date
+    description: "Fecha de la segunda sesión de entrenamientos libres."
+  - name: fp2_time
+    description: "Hora de la segunda sesión de entrenamientos libres."
+  - name: fp3_date
+    description: "Fecha de la tercera sesión de entrenamientos libres."
+  - name: fp3_time
+    description: "Hora de la tercera sesión de entrenamientos libres."
+  - name: quali_date
+    description: "Fecha de la clasificación."
+  - name: quali_time
+    description: "Hora de la clasificación."
+  - name: sprint_date
+    description: "Fecha de la carrera sprint. Nulo si no hubo."
+  - name: sprint_time
+    description: "Hora de la carrera sprint."
+  - name: circuit_ref
+    description: "Referencia corta del circuito en el origen."
+    data_tests:
+    - not_null
+  - name: circuit_name
+    description: "Nombre del circuito."
+  - name: circuit_location
+    description: "Localidad del circuito."
+  - name: circuit_country
+    description: "País del circuito."
+  - name: circuit_lat
+    description: "Latitud del circuito."
+  - name: circuit_lng
+    description: "Longitud del circuito."
+  - name: circuit_altitude_m
+    description: "Altitud del circuito en metros."
+  - name: circuit_url
+    description: "Enlace de Wikipedia del circuito."
+  - name: date_load
+    description: "Fecha y hora de carga del registro en Bronze."
+- name: stg_f1__resultados
+  description: "Resultados de carrera de Bronze, uno a uno: renombra y convierte tipos. Una fila por piloto y carrera (1950-2024), con los datos del piloto y del constructor incluidos."
+  columns:
+  - name: season_year
+    description: "Año de la temporada."
+    data_tests:
+    - not_null
+  - name: round
+    description: "Número de ronda dentro de la temporada."
+    data_tests:
+    - not_null
+  - name: driver_forename
+    description: "Nombre del piloto."
+  - name: driver_surname
+    description: "Apellido del piloto."
+  - name: driver_dob
+    description: "Fecha de nacimiento del piloto."
+  - name: driver_ref
+    description: "Referencia corta del piloto en el origen."
+    data_tests:
+    - not_null
+  - name: driver_number
+    description: "Número permanente del piloto. Nulo si no tiene."
+  - name: driver_code
+    description: "Código de tres letras del piloto. Nulo si no tiene."
+  - name: driver_nationality
+    description: "Nacionalidad del piloto."
+  - name: driver_url
+    description: "Enlace de Wikipedia del piloto."
+  - name: constructor_ref
+    description: "Referencia corta del constructor en el origen."
+    data_tests:
+    - not_null
+  - name: constructor_name
+    description: "Nombre del constructor."
+  - name: constructor_nationality
+    description: "Nacionalidad del constructor."
+  - name: constructor_url
+    description: "Enlace de Wikipedia del constructor."
+  - name: car_number
+    description: "Número de coche en la carrera. Nulo si no consta."
+  - name: grid
+    description: "Posición de salida. 0 si salió desde el pit lane."
+    data_tests:
+    - not_null
+  - name: position
+    description: "Posición oficial. Nulo si no fue clasificado."
+  - name: position_text
+    description: "Posición en texto (número o letra del estado)."
+  - name: position_order
+    description: "Orden final, definido también para los que no terminaron."
+    data_tests:
+    - not_null
+  - name: points
+    description: "Puntos obtenidos."
+    data_tests:
+    - not_null
+  - name: laps
+    description: "Vueltas completadas."
+    data_tests:
+    - not_null
+  - name: race_time_text
+    description: "Tiempo de carrera en texto."
+  - name: race_time_ms
+    description: "Tiempo de carrera en milisegundos. Nulo si no lo tiene."
+  - name: fastest_lap
+    description: "Vuelta en la que hizo su vuelta rápida."
+  - name: fastest_lap_rank
+    description: "Puesto de su vuelta rápida entre todos los pilotos."
+  - name: fastest_lap_time
+    description: "Tiempo de su vuelta rápida."
+  - name: fastest_lap_speed_kmh
+    description: "Velocidad media de su vuelta rápida en km/h."
+  - name: status
+    description: "Estado final en texto (por ejemplo Finished o Engine)."
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('status_classification')
+          field: status
+  - name: date_load
+    description: "Fecha y hora de carga del registro en Bronze."
+- name: stg_f1__clasificacion
+  description: "Clasificación y sprint de Bronze, uno a uno: renombra y convierte tipos. Una fila por piloto y carrera (1994-2024). Las columnas sprint_* están vacías cuando no hubo sprint."
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - season_year
+        - round
+        - driver_ref
+  columns:
+  - name: season_year
+    description: "Año de la temporada."
+    data_tests:
+    - not_null
+  - name: round
+    description: "Número de ronda dentro de la temporada."
+    data_tests:
+    - not_null
+  - name: driver_forename
+    description: "Nombre del piloto."
+  - name: driver_surname
+    description: "Apellido del piloto."
+  - name: driver_dob
+    description: "Fecha de nacimiento del piloto."
+  - name: driver_ref
+    description: "Referencia corta del piloto en el origen."
+    data_tests:
+    - not_null
+  - name: driver_number
+    description: "Número permanente del piloto. Nulo si no tiene."
+  - name: driver_code
+    description: "Código de tres letras del piloto. Nulo si no tiene."
+  - name: driver_nationality
+    description: "Nacionalidad del piloto."
+  - name: driver_url
+    description: "Enlace de Wikipedia del piloto."
+  - name: quali_constructor_ref
+    description: "Referencia del constructor con el que clasificó."
+    data_tests:
+    - not_null
+  - name: quali_constructor_name
+    description: "Nombre del constructor con el que clasificó."
+  - name: quali_constructor_nationality
+    description: "Nacionalidad del constructor con el que clasificó."
+  - name: quali_constructor_url
+    description: "Enlace de Wikipedia de ese constructor."
+  - name: quali_car_number
+    description: "Número de coche en la clasificación."
+  - name: quali_position
+    description: "Posición en la clasificación."
+    data_tests:
+    - not_null
+  - name: q1
+    description: "Mejor tiempo de la Q1 en texto m:ss.mmm."
+  - name: q2
+    description: "Mejor tiempo de la Q2 en texto. Nulo antes de 2006 o si no la disputó."
+  - name: q3
+    description: "Mejor tiempo de la Q3 en texto. Nulo antes de 2006 o si no la disputó."
+  - name: sprint_constructor_ref
+    description: "Referencia del constructor en el sprint. Nulo si no hubo sprint."
+  - name: sprint_constructor_name
+    description: "Nombre del constructor en el sprint."
+  - name: sprint_constructor_nationality
+    description: "Nacionalidad del constructor en el sprint."
+  - name: sprint_constructor_url
+    description: "Enlace de Wikipedia de ese constructor."
+  - name: sprint_car_number
+    description: "Número de coche en el sprint."
+  - name: sprint_grid
+    description: "Posición de salida en el sprint."
+  - name: sprint_position
+    description: "Posición oficial en el sprint."
+  - name: sprint_position_text
+    description: "Posición en el sprint en texto."
+  - name: sprint_position_order
+    description: "Orden final en el sprint."
+  - name: sprint_points
+    description: "Puntos del sprint."
+  - name: sprint_laps
+    description: "Vueltas del sprint."
+  - name: sprint_time_text
+    description: "Tiempo del sprint en texto."
+  - name: sprint_time_ms
+    description: "Tiempo del sprint en milisegundos."
+  - name: sprint_fastest_lap
+    description: "Vuelta rápida del sprint."
+  - name: sprint_fastest_lap_time
+    description: "Tiempo de la vuelta rápida del sprint."
+  - name: sprint_status
+    description: "Estado final en el sprint en texto."
+    data_tests:
+    - relationships:
+        arguments:
+          to: ref('status_classification')
+          field: status
+  - name: date_load
+    description: "Fecha y hora de carga del registro en Bronze."
