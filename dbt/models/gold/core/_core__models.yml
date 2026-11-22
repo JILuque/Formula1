@@ -322,3 +322,49 @@ models:
     description: "Longitud."
   - name: circuit_altitude_m
     description: "Altitud en metros."
+
+
+
+unit_tests:
+
+  - name: test_fct_driver_season_score
+    description: "Con dos pilotos fiables (A y B) y uno sin muestra fiable (D), comprueba los z-scores, el score (z_c1 - z_c2 + z_c3) / 3 y que D tiene score nulo sin alterar la media de la temporada."
+    model: fct_driver_season
+    given:
+      - input: ref('int_f1__driver_season_c1')
+        rows:
+          - {id_driver: A, season_year: 2020, n_duels: 20, c1_win_rate: 0.75}
+          - {id_driver: B, season_year: 2020, n_duels: 20, c1_win_rate: 0.25}
+          - {id_driver: D, season_year: 2020, n_duels: 4,  c1_win_rate: 1.0}
+      - input: ref('int_f1__driver_season_c2')
+        rows:
+          - {id_driver: A, season_year: 2020, n_races: 20, n_incidents: 0,  c2_incident_rate: 0.0}
+          - {id_driver: B, season_year: 2020, n_races: 20, n_incidents: 10, c2_incident_rate: 0.5}
+          - {id_driver: D, season_year: 2020, n_races: 12, n_incidents: 9,  c2_incident_rate: 0.75}
+      - input: ref('int_f1__driver_season_c3')
+        rows:
+          - {id_driver: A, season_year: 2020, n_races: 18, c3_positions_vs_car: 3}
+          - {id_driver: B, season_year: 2020, n_races: 18, c3_positions_vs_car: 1}
+          - {id_driver: D, season_year: 2020, n_races: 12, c3_positions_vs_car: 5}
+    expect:
+      rows:
+        - {id_driver: A, season_year: 2020, is_reliable_sample: true,  z_c1: 1, z_c2: -1, z_c3: 1,  score: 1}
+        - {id_driver: B, season_year: 2020, is_reliable_sample: true,  z_c1: -1, z_c2: 1, z_c3: -1, score: -1}
+        - {id_driver: D, season_year: 2020, is_reliable_sample: false, z_c1: 2, z_c2: 2,  z_c3: 3,  score: null}
+
+  - name: test_fct_driver_season_desviacion_cero
+    description: "Con un solo piloto fiable en la temporada la desviación es 0: los z-scores y el score quedan nulos y no hay error de división por cero."
+    model: fct_driver_season
+    given:
+      - input: ref('int_f1__driver_season_c1')
+        rows:
+          - {id_driver: A, season_year: 2021, n_duels: 20, c1_win_rate: 0.75}
+      - input: ref('int_f1__driver_season_c2')
+        rows:
+          - {id_driver: A, season_year: 2021, n_races: 20, n_incidents: 0, c2_incident_rate: 0.0}
+      - input: ref('int_f1__driver_season_c3')
+        rows:
+          - {id_driver: A, season_year: 2021, n_races: 18, c3_positions_vs_car: 3}
+    expect:
+      rows:
+        - {id_driver: A, season_year: 2021, is_reliable_sample: true, z_c1: null, z_c2: null, z_c3: null, score: null}
