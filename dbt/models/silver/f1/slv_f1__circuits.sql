@@ -30,7 +30,7 @@ latest as (
 )
 
 select
-      md5(circuit_ref) as id_circuit
+      {{ dbt_utils.generate_surrogate_key(['circuit_ref']) }} as id_circuit
     , circuit_ref
     , circuit_name
     , circuit_location

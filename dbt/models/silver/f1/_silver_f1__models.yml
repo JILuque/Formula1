@@ -1,0 +1,361 @@
+version: 2
+models:
+- name: slv_f1__circuits
+  description: "Circuitos. Una fila por circuito con sus datos más recientes. Incremental (merge por id_circuit), 2000-2024."
+  columns:
+  - name: id_circuit
+    description: "Clave del circuito: clave sustituta de su referencia."
+    data_tests:
+    - unique
+    - not_null
+  - name: circuit_ref
+    description: "Referencia corta del circuito en el origen."
+    data_tests:
+    - not_null
+  - name: circuit_name
+    description: "Nombre del circuito."
+  - name: circuit_location
+    description: "Localidad del circuito."
+  - name: circuit_country
+    description: "País del circuito."
+  - name: circuit_lat
+    description: "Latitud del circuito."
+  - name: circuit_lng
+    description: "Longitud del circuito."
+  - name: circuit_altitude_m
+    description: "Altitud del circuito en metros."
+  - name: last_season_year
+    description: "Última temporada en la que aparece (sirve para reprocesar en la carga incremental)."
+- name: slv_f1__races
+  description: "Carreras. Una fila por gran premio (2000-2024), con un indicador de sprint. Incremental (merge por id_race)."
+  columns:
+  - name: id_race
+    description: "Clave de la carrera: clave sustituta de temporada y ronda."
+    data_tests:
+    - unique
+    - not_null
+  - name: season_year
+    description: "Año de la temporada."
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: '{{ var(''season_start'') }}'
+          max_value: '{{ var(''season_end'') }}'
+  - name: round
+    description: "Número de ronda dentro de la temporada."
+    data_tests:
+    - not_null
+  - name: race_name
+    description: "Nombre del gran premio."
+  - name: race_date
+    description: "Fecha de la carrera."
+    data_tests:
+    - not_null
+  - name: has_sprint
+    description: "Verdadero si ese fin de semana hubo sprint."
+    data_tests:
+    - not_null
+  - name: id_circuit
+    description: "Clave del circuito: clave sustituta de su referencia."
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('slv_f1__circuits')
+          field: id_circuit
+  - name: circuit_ref
+    description: "Referencia corta del circuito en el origen."
+- name: slv_f1__drivers
+  description: "Pilotos. Una fila por piloto con sus datos más recientes, extraídos de los resultados. Incremental (merge por id_driver)."
+  columns:
+  - name: id_driver
+    description: "Clave del piloto: clave sustituta de su referencia."
+    data_tests:
+    - unique
+    - not_null
+  - name: driver_ref
+    description: "Referencia corta del piloto en el origen."
+    data_tests:
+    - unique
+    - not_null
+  - name: driver_forename
+    description: "Nombre del piloto."
+  - name: driver_surname
+    description: "Apellido del piloto."
+  - name: driver_full_name
+    description: "Nombre y apellidos del piloto."
+    data_tests:
+    - not_null
+  - name: driver_dob
+    description: "Fecha de nacimiento del piloto."
+  - name: driver_code
+    description: "Código de tres letras del piloto. Nulo si no tiene."
+  - name: driver_nationality
+    description: "Nacionalidad del piloto."
+  - name: last_season_year
+    description: "Última temporada en la que aparece (sirve para reprocesar en la carga incremental)."
+- name: slv_f1__constructors
+  description: "Constructores. Una fila por constructor con sus datos más recientes, extraídos de los resultados. Incremental (merge por id_constructor)."
+  columns:
+  - name: id_constructor
+    description: "Clave del constructor: clave sustituta de su referencia."
+    data_tests:
+    - unique
+    - not_null
+  - name: constructor_ref
+    description: "Referencia corta del constructor en el origen."
+    data_tests:
+    - unique
+    - not_null
+  - name: constructor_name
+    description: "Nombre del constructor."
+    data_tests:
+    - not_null
+  - name: constructor_nationality
+    description: "Nacionalidad del constructor."
+  - name: last_season_year
+    description: "Última temporada en la que aparece (sirve para reprocesar en la carga incremental)."
+- name: slv_f1__results
+  description: "Resultados de carrera (2000-2024). Una fila por piloto y carrera, con la categoría del estado final. Incremental (merge por id_result)."
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - id_race
+        - id_driver
+  columns:
+  - name: id_result
+    description: "Clave del resultado: clave sustituta de temporada, ronda y piloto."
+    data_tests:
+    - unique
+    - not_null
+  - name: id_race
+    description: "Clave de la carrera: clave sustituta de temporada y ronda."
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('slv_f1__races')
+          field: id_race
+  - name: id_driver
+    description: "Clave del piloto: clave sustituta de su referencia."
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('slv_f1__drivers')
+          field: id_driver
+  - name: id_constructor
+    description: "Clave del constructor: clave sustituta de su referencia."
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('slv_f1__constructors')
+          field: id_constructor
+  - name: season_year
+    description: "Año de la temporada."
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: '{{ var(''season_start'') }}'
+          max_value: '{{ var(''season_end'') }}'
+  - name: round
+    description: "Número de ronda dentro de la temporada."
+  - name: car_number
+    description: "Número de coche en la carrera. Nulo si no consta."
+  - name: grid
+    description: "Posición de salida. 0 si salió desde el pit lane."
+  - name: position
+    description: "Posición oficial. Nulo si no fue clasificado."
+  - name: position_order
+    description: "Orden final, definido también para los que no terminaron."
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 1
+  - name: is_classified
+    description: "Verdadero si tiene posición oficial."
+    data_tests:
+    - not_null
+  - name: points
+    description: "Puntos obtenidos."
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 0
+  - name: laps
+    description: "Vueltas completadas."
+  - name: race_time_ms
+    description: "Tiempo de carrera en milisegundos. Nulo si no lo tiene."
+  - name: status
+    description: "Estado final en texto (por ejemplo Finished o Engine)."
+  - name: status_category
+    description: "Categoría del estado final (seed status_classification): finished, mechanical, driver_incident, other_not_finished o not_started. Nulo si el estado no está en la seed."
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - finished
+          - mechanical
+          - driver_incident
+          - other_not_finished
+          - not_started
+- name: slv_f1__qualifying
+  description: "Clasificación (2000-2024). Una fila por piloto y carrera con los tiempos en milisegundos. Hay carreras sin clasificación en 2000-2002. Incremental (merge por id_qualifying)."
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - id_race
+        - id_driver
+  columns:
+  - name: id_qualifying
+    description: "Clave de la clasificación: clave sustituta de temporada, ronda y piloto."
+    data_tests:
+    - unique
+    - not_null
+  - name: id_race
+    description: "Clave de la carrera: clave sustituta de temporada y ronda."
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('slv_f1__races')
+          field: id_race
+  - name: id_driver
+    description: "Clave del piloto: clave sustituta de su referencia."
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('slv_f1__drivers')
+          field: id_driver
+  - name: id_constructor
+    description: "Clave del constructor: clave sustituta de su referencia."
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('slv_f1__constructors')
+          field: id_constructor
+  - name: season_year
+    description: "Año de la temporada."
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: '{{ var(''season_start'') }}'
+          max_value: '{{ var(''season_end'') }}'
+  - name: round
+    description: "Número de ronda dentro de la temporada."
+  - name: car_number
+    description: "Número de coche en la carrera. Nulo si no consta."
+  - name: position
+    description: "Posición oficial. Nulo si no fue clasificado."
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 1
+  - name: q1_ms
+    description: "Mejor tiempo de la Q1 en milisegundos. Nulo si el valor no se pudo convertir."
+  - name: q2_ms
+    description: "Mejor tiempo de la Q2 en milisegundos."
+  - name: q3_ms
+    description: "Mejor tiempo de la Q3 en milisegundos."
+- name: slv_f1__sprint_results
+  description: "Resultados de los sprint (2021-2024, 18 carreras). Una fila por piloto y sprint, con la categoría del estado final. Incremental (merge por id_sprint_result)."
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - id_race
+        - id_driver
+  columns:
+  - name: id_sprint_result
+    description: "Clave del resultado del sprint: clave sustituta de temporada, ronda y piloto."
+    data_tests:
+    - unique
+    - not_null
+  - name: id_race
+    description: "Clave de la carrera: clave sustituta de temporada y ronda."
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('slv_f1__races')
+          field: id_race
+  - name: id_driver
+    description: "Clave del piloto: clave sustituta de su referencia."
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('slv_f1__drivers')
+          field: id_driver
+  - name: id_constructor
+    description: "Clave del constructor: clave sustituta de su referencia."
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('slv_f1__constructors')
+          field: id_constructor
+  - name: season_year
+    description: "Año de la temporada."
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: '{{ var(''season_start'') }}'
+          max_value: '{{ var(''season_end'') }}'
+  - name: round
+    description: "Número de ronda dentro de la temporada."
+  - name: car_number
+    description: "Número de coche en la carrera. Nulo si no consta."
+  - name: grid
+    description: "Posición de salida. 0 si salió desde el pit lane."
+  - name: position
+    description: "Posición oficial. Nulo si no fue clasificado."
+  - name: position_order
+    description: "Orden final, definido también para los que no terminaron."
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 1
+  - name: is_classified
+    description: "Verdadero si tiene posición oficial."
+    data_tests:
+    - not_null
+  - name: points
+    description: "Puntos obtenidos."
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 0
+  - name: laps
+    description: "Vueltas completadas."
+  - name: sprint_time_ms
+    description: "Tiempo del sprint en milisegundos."
+  - name: status
+    description: "Estado final en texto (por ejemplo Finished o Engine)."
+  - name: status_category
+    description: "Categoría del estado final (seed status_classification): finished, mechanical, driver_incident, other_not_finished o not_started. Nulo si el estado no está en la seed."
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - finished
+          - mechanical
+          - driver_incident
+          - other_not_finished
+          - not_started

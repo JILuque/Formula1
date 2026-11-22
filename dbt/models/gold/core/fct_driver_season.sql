@@ -54,7 +54,7 @@ z_scores as (
 )
 
 select
-    md5(concat_ws('|', id_driver, season_year)) as id_driver_season,
+    {{ dbt_utils.generate_surrogate_key(['id_driver', 'season_year']) }} as id_driver_season,
     id_driver,
     season_year,
     n_races,

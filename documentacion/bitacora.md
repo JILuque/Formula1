@@ -26,9 +26,10 @@ con los CSV: 126 pilotos (10.071 carreras con salida y 479 victorias), 38 constr
 479 carreras con su circuito, y 10.079 filas en `gold_results__enriched` y
 `fct_driver_race` (9.098 con clasificación y 360 con sprint; 37.069 puntos de carrera,
 558 de sprint y 37.627 en total). Documenté todos los modelos con un `.yml` por carpeta, 
-con la descripción de cada modelo y de cada columna: `_f1__models.yml` en `models/staging/f1/` 
-y en `models/silver/f1/`, `_intermediate__models.yml` en `models/gold/intermediate/` y 
-`_core__models.yml` en `models/gold/core/`. `dbt parse` pasa sin errores. Cada columna 
+con la descripción de cada modelo y de cada columna: `_staging_f1__models.yml` en
+`models/staging/f1/`, `_silver_f1__models.yml` en `models/silver/f1/`,
+`_intermediate__models.yml` en `models/gold/intermediate/` y `_core__models.yml` en
+`models/gold/core/`. `dbt parse` pasa sin errores. Cada columna 
 documentada existe en el SQL de su modelo (comprobado).
  
 **Por qué lo hice así (y qué alternativa descarté):**
@@ -412,7 +413,7 @@ carrera, clasificación y sprint juntos (cada sesión disputada vale un duelo).
 `stg_f1__clasificacion` en `models/staging/f1/`, como vistas en
 `DEV_SILVER_DB`, schema `f1`. Cada una lee su tabla de Bronze con `source()` y
 la expone renombrada y con los tipos correctos. `dbt build --select staging`
-pasa. [Pendiente: `_f1__models.yml` con descripciones y tests, que va con el
+pasa. [Pendiente: `_staging_f1__models.yml` con descripciones y tests, que va con el
 día 3.]
  
 **Por qué lo hice así (y qué alternativas descarté):**

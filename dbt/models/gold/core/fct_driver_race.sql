@@ -10,7 +10,7 @@ with enriched as (
 )
 
 select
-    md5(concat_ws('|', id_race, id_driver)) as id_driver_race,
+    {{ dbt_utils.generate_surrogate_key(['id_race', 'id_driver']) }} as id_driver_race,
     id_race,
     id_driver,
     id_constructor,

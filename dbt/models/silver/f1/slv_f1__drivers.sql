@@ -29,7 +29,7 @@ latest as (
 )
 
 select
-      md5(driver_ref) as id_driver
+      {{ dbt_utils.generate_surrogate_key(['driver_ref']) }} as id_driver
     , driver_ref
     , driver_forename
     , driver_surname
