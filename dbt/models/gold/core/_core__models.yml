@@ -1,4 +1,5 @@
 version: 2
+
 models:
 - name: fct_driver_season
   description: "Tabla de hechos con el score compuesto de cada piloto y temporada (2000-2024). Una fila por piloto y temporada. Reúne C1 (duelo con el compañero), C2 (incidentes del piloto) y C3 (rendimiento frente al coche). El score es nulo si la muestra no es fiable."
@@ -23,7 +24,7 @@ models:
           to: ref('dim_driver')
           field: id_driver
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -109,7 +110,7 @@ models:
           to: ref('dim_constructor')
           field: id_constructor
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -117,7 +118,7 @@ models:
           min_value: '{{ var(''season_start'') }}'
           max_value: '{{ var(''season_end'') }}'
   - name: round
-    description: "Número de ronda dentro de la temporada."
+    description: '{{ doc("round") }}'
     data_tests:
     - not_null
   - name: quali_position
@@ -129,7 +130,7 @@ models:
   - name: q3_ms
     description: "Mejor tiempo de la Q3 en milisegundos. Nulo si no la disputó o es anterior a 2006."
   - name: grid
-    description: "Posición de salida. 0 si salió desde el pit lane."
+    description: '{{ doc("grid") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -147,7 +148,7 @@ models:
     data_tests:
     - not_null
   - name: status_category
-    description: "Categoría del estado final: finished, mechanical, driver_incident, other_not_finished o not_started."
+    description: '{{ doc("status_category") }}'
     data_tests:
     - not_null
     - accepted_values:
@@ -159,9 +160,9 @@ models:
           - other_not_finished
           - not_started
   - name: laps
-    description: "Vueltas completadas."
+    description: '{{ doc("laps") }}'
   - name: race_time_ms
-    description: "Tiempo de carrera en milisegundos. Nulo si no lo tiene."
+    description: '{{ doc("race_time_ms") }}'
   - name: points
     description: "Puntos de la carrera."
     data_tests:
@@ -287,7 +288,7 @@ models:
     - unique
     - not_null
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -295,7 +296,7 @@ models:
           min_value: '{{ var(''season_start'') }}'
           max_value: '{{ var(''season_end'') }}'
   - name: round
-    description: "Número de ronda dentro de la temporada."
+    description: '{{ doc("round") }}'
     data_tests:
     - not_null
   - name: race_name

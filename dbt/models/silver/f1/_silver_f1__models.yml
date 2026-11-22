@@ -1,4 +1,5 @@
 version: 2
+
 models:
 - name: slv_f1__circuits
   description: "Circuitos. Una fila por circuito con sus datos más recientes. Incremental (merge por id_circuit), 2000-2024."
@@ -35,7 +36,7 @@ models:
     - unique
     - not_null
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -43,7 +44,7 @@ models:
           min_value: '{{ var(''season_start'') }}'
           max_value: '{{ var(''season_end'') }}'
   - name: round
-    description: "Número de ronda dentro de la temporada."
+    description: '{{ doc("round") }}'
     data_tests:
     - not_null
   - name: race_name
@@ -155,7 +156,7 @@ models:
           to: ref('slv_f1__constructors')
           field: id_constructor
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -163,11 +164,11 @@ models:
           min_value: '{{ var(''season_start'') }}'
           max_value: '{{ var(''season_end'') }}'
   - name: round
-    description: "Número de ronda dentro de la temporada."
+    description: '{{ doc("round") }}'
   - name: car_number
     description: "Número de coche en la carrera. Nulo si no consta."
   - name: grid
-    description: "Posición de salida. 0 si salió desde el pit lane."
+    description: '{{ doc("grid") }}'
   - name: position
     description: "Posición oficial. Nulo si no fue clasificado."
   - name: position_order
@@ -189,13 +190,13 @@ models:
         arguments:
           min_value: 0
   - name: laps
-    description: "Vueltas completadas."
+    description: '{{ doc("laps") }}'
   - name: race_time_ms
-    description: "Tiempo de carrera en milisegundos. Nulo si no lo tiene."
+    description: '{{ doc("race_time_ms") }}'
   - name: status
     description: "Estado final en texto (por ejemplo Finished o Engine)."
   - name: status_category
-    description: "Categoría del estado final (seed status_classification): finished, mechanical, driver_incident, other_not_finished o not_started. Nulo si el estado no está en la seed."
+    description: '{{ doc("status_category") }}'
     data_tests:
     - not_null
     - accepted_values:
@@ -245,7 +246,7 @@ models:
           to: ref('slv_f1__constructors')
           field: id_constructor
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -253,7 +254,7 @@ models:
           min_value: '{{ var(''season_start'') }}'
           max_value: '{{ var(''season_end'') }}'
   - name: round
-    description: "Número de ronda dentro de la temporada."
+    description: '{{ doc("round") }}'
   - name: car_number
     description: "Número de coche en la carrera. Nulo si no consta."
   - name: position
@@ -308,7 +309,7 @@ models:
           to: ref('slv_f1__constructors')
           field: id_constructor
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -316,11 +317,11 @@ models:
           min_value: '{{ var(''season_start'') }}'
           max_value: '{{ var(''season_end'') }}'
   - name: round
-    description: "Número de ronda dentro de la temporada."
+    description: '{{ doc("round") }}'
   - name: car_number
     description: "Número de coche en la carrera. Nulo si no consta."
   - name: grid
-    description: "Posición de salida. 0 si salió desde el pit lane."
+    description: '{{ doc("grid") }}'
   - name: position
     description: "Posición oficial. Nulo si no fue clasificado."
   - name: position_order
@@ -342,13 +343,13 @@ models:
         arguments:
           min_value: 0
   - name: laps
-    description: "Vueltas completadas."
+    description: '{{ doc("laps") }}'
   - name: sprint_time_ms
     description: "Tiempo del sprint en milisegundos."
   - name: status
     description: "Estado final en texto (por ejemplo Finished o Engine)."
   - name: status_category
-    description: "Categoría del estado final (seed status_classification): finished, mechanical, driver_incident, other_not_finished o not_started. Nulo si el estado no está en la seed."
+    description: '{{ doc("status_category") }}'
     data_tests:
     - not_null
     - accepted_values:

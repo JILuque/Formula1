@@ -17,6 +17,105 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-22: día 3 (dbt_utils, tests, unit tests y docs blocks)
+**Qué hice:** seguí las diapositivas del día 3 sobre el proyecto.
+- **Paquete `dbt_utils`.** Creé `packages.yml` (`dbt-labs/dbt_utils`, versión `>=1.3.0,<2.0.0`),
+  ejecuté `dbt deps` y subí `package-lock.yml`; `dbt_packages/` queda fuera de git.
+- **Claves con `generate_surrogate_key`.** Sustituí `md5(concat_ws('|', ...))` en los 9
+  modelos que generan claves (los 7 de Silver, `fct_driver_season` y `fct_driver_race`) y
+  reconstruí con `--full-refresh`, porque las claves cambian de valor en todo el proyecto.
+  `dbt build` pasa.
+- **Tests de datos (unas 205 comprobaciones):** Silver 71, staging 23, Gold 111 (core 67 e
+  intermediate 44). `dbt build --select staging` y `dbt build --select gold` pasan.
+  [Confirmar: `dbt build --select silver`.]
+- **Tests singulares** en `tests/singular/` (`dbt test --select test_type:singular` pasa):
+  `assert_cobertura_temporadas` (hay las 25 temporadas), `assert_cobertura_carreras` (cada
+  temporada tiene exactamente las carreras del calendario oficial, 479 en total),
+  `assert_numero_duelos_C1` (las victorias de C1 suman la mitad de los duelos en cada
+  temporada) y `assert_tiempos_no_perdidos` (ningún tiempo de clasificación existente se pierde
+  al pasarlo a milisegundos; `warn_if='>0'`, `error_if='>20'`).
+- **Dos unit tests** sobre `fct_driver_season`, dentro de `_core__models.yml`
+  (`dbt test --select test_type:unit` pasa): uno comprueba la fórmula del score, los z-scores y
+  el score nulo en la muestra no fiable; el otro, que con desviación 0 los z-scores y el score
+  quedan nulos sin error de división.
+- **Docs blocks.** Creé `docs/f1/_f1__docs.md` con seis bloques (`season_year`, `round`,
+  `grid`, `laps`, `race_time_ms` y `status_category`) y los usé con `doc()` en 43 columnas;
+  añadí `docs-paths: ["docs"]` a `dbt_project.yml`. [Confirmar: `dbt parse`, `dbt build` y
+  `dbt docs generate` tras este cambio.]
+- Unifiqué los nombres de los `.yml`: `_staging_f1__models.yml`, `_silver_f1__models.yml`,
+  `_intermediate__models.yml` y `_core__models.yml`.
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- **`generate_surrogate_key` en lugar de `md5` a mano.** Es la función del paquete que vimos
+  en clase: hace el hash, pone un separador entre columnas y trata los nulos, y se escribe
+  igual en todos los modelos. El `md5` manual hacía lo mismo, pero con más código repetido y
+  sin tratamiento de nulos. Detalle que conozco: con una sola columna, un nulo y un texto
+  vacío darían la misma clave; las columnas de origen llevan `not_null`, que lo cubre. La
+  decisión de la entrada de Silver sobre `md5` queda sustituida por esta.
+- **Staging: solo `not_null` en las claves y las medidas principales.** Staging es 1:1 con
+  Bronze y conserva 1950-2024, así que no hay `unique` en `stg_f1__resultados` (antes de 1979
+  hay combinaciones repetidas por coches compartidos). Solo `calendario` y `clasificacion`
+  llevan `unique_combination_of_columns`, comprobado con los datos.
+- **`relationships` de `status` contra la seed, ya en staging.** Es la red de seguridad del
+  `left join` de Silver: un estado nuevo o mal escrito falla aquí, antes de dejar la categoría
+  vacía.
+- **Silver: `unique` y `not_null` en los `id_*`, `relationships` entre hechos y entidades,
+  `accepted_values` en `status_category` y `accepted_range` de `season_year` con las `vars`.**
+  Los rangos salen de `season_start` y `season_end`, no de años escritos a mano.
+- **Gold: `relationships` de los hechos con las tres dimensiones y rangos 0-1 en las tasas.** Es
+  lo que garantiza que el modelo en estrella está bien unido. No hay tests sobre
+  `int_f1__teammate_duels` porque es `ephemeral` y dbt no lo permite; lo cubre el test
+  singular de C1. `n_duels` y `c1_win_rate` de `fct_driver_season` no llevan `not_null`:
+  pueden ser nulos a propósito.
+- **Test singular de carreras con los números exactos, agrupados con `when ... in (...)`.**
+  Detecta que falte una sola carrera, no solo una carga muy incompleta. Descarté el umbral
+  "menos de 10 carreras": no avisaba de 21 en lugar de 22. Los valores salen del calendario
+  de los CSV y suman 479. Coste asumido: están escritos en el test, y si amplío el periodo
+  hay que añadir la temporada; la última línea del test hace que falle si falta, para no
+  pasar sin comprobarla. Lo agrupé por número de carreras (8 líneas) y no año por año (25
+  valores): se ve el patrón de un vistazo. Es un test independiente del de las 25
+  temporadas, porque una temporada que falta no aparece en el `group by`.
+- **Test de cobertura de temporadas sin `generator`.** La versión con `generator`,
+  `row_number` y `left join` era correcta pero difícil de leer; la sustituí por un `count
+  (distinct ...)` contra `season_end - season_start + 1`.
+- **Severidad: `error` por defecto, `warn` solo para los tiempos.** El número de carreras de
+  una temporada es un hecho cerrado: si no coincide, el score está mal. Los tiempos son un
+  aviso de calidad: un tiempo perdido quita un duelo de unos 4.400 de clasificación.
+  Cuidado con el argumento: **sí uso los tiempos** (los duelos de clasificación exigen Q1), así
+  que no es que no importen, sino que el impacto de uno es mínimo. Umbral `error_if='>20'`:
+  unas 9.000 filas de clasificación en 2000-2024, así que 20 son aproximadamente el 0,2 %; es
+  un umbral elegido por mí, sin cálculo detrás. Con `try_cast` el dato malo no rompe la
+  carga, y el test impide que se pierda sin que nadie lo sepa.
+- **Unit tests con 0,75 y 0,25 en C1 y 0 y 0,5 en C2.** Son números que el ordenador
+  representa sin redondeo, así que los z-scores salen exactos (+1 y -1) y se pueden calcular
+  a mano. Cada test responde a una pregunta: el primero incluye un piloto no fiable (D) para
+  comprobar que no altera la media y la desviación de la temporada; el segundo comprueba el
+  `nullif` de la desviación 0. Complementan a los tests de datos: estos dicen que los datos
+  son válidos, y el unit test que la fórmula está bien aplicada.
+- **Docs blocks solo donde el texto estaba idéntico en varias capas.** Una columna escrita en
+  15 sitios es un riesgo de que se desincronice. `status_category` lleva una tabla con las
+  cinco categorías y su efecto en el score, como el `order_status` del curso. No usé bloques
+  para los `id_*`: en su modelo son la clave y en los hechos una referencia, y un único texto
+  borraría esa diferencia. Descarté documentar todas las columnas con bloques por exceso de
+  ficheros para el beneficio.
+- **Los `.yml` con tests siguen siendo uno por carpeta**, con nombre `_<capa>_f1__models.yml`
+  en staging y Silver, y `_<carpeta>__models.yml` en Gold, que no tiene un origen único.
+
+**Problemas encontrados y cómo los resolví:**
+- Las descripciones aparecían unas con comillas y otras sin ellas tras regenerar los `.yml`.
+  Decidí poner todas entre comillas dobles y lo regeneré con ese formato.
+- Tras el cambio de claves, las descripciones seguían diciendo "md5"; las cambié por "clave
+  sustituta de".
+- Una primera justificación del test de tiempos ("no uso los tiempos") era incorrecta: C1 los
+  necesita. La reescribí con el argumento del impacto.
+
+**Pendiente / siguiente paso:** pull request de DEV a `main`, despliegue y job en PRO;
+contraste entre el ranking en bruto y el ajustado por coche; modelos físicos de cada capa
+(para la defensa); y subir `04_demo_incremental.sql` y los CSV de prueba a `/ingesta`.
+Opcional: `agg_driver_career` y Power BI.
+
+---
+
 ### 2026-11-22: dimensiones, gold_results__enriched y fct_driver_race
 **Qué hice:** completé el modelo dimensional de Gold. En `models/gold/core/` creé las
 tres dimensiones (`dim_driver`, `dim_constructor`, `dim_race`) y la segunda tabla de
@@ -747,6 +846,15 @@ el 03 para recrear los clones y los permisos.
 | `left join` desde `results` en el `enriched` | `inner join` | Faltan clasificaciones (981 filas) y el sprint solo existe en 18 carreras; con `inner` se perderían filas |
 | `fct_driver_race` con `total_points` y `coalesce(sprint_points, 0)` | Sumar sin `coalesce` | `null + número` da `null`: se perdería el total en carreras sin sprint |
 | Un `.yml` por carpeta con descripción de modelos y columnas, sin tests hasta el día 3 | Un `.yml` por modelo; tests desde el principio | Menos archivos y misma convención en todas las capas; los tests se añaden juntos al ver cómo los pide el curso |
+| Claves con `dbt_utils.generate_surrogate_key` (sustituye a la decisión del `md5`) | `md5(concat_ws('\|', ...))` a mano | Función del paquete vista en clase: mismo hash en todos los modelos y con tratamiento de nulos. Con una sola columna un nulo y un texto vacío darían la misma clave; `not_null` en el origen lo cubre. Reconstruido con `--full-refresh` |
+| Staging solo con `not_null`, `unique` en calendario y clasificación, y `relationships` de `status` con la seed | `unique` en `resultados`; sin tests | Antes de 1979 `resultados` repite (temporada, ronda, piloto); el `relationships` es la red de seguridad del `left join` de Silver |
+| Tests de Silver y Gold: unicidad, `relationships`, valores permitidos y rangos con `vars` | Años escritos a mano en los tests | Garantizan el modelo en estrella y se ajustan al cambiar el periodo. Sin tests sobre el `ephemeral` de duelos (no se puede) |
+| Test singular de carreras por temporada con valores exactos agrupados | Umbral de mínimo de carreras; un valor por año | Detecta que falte una sola carrera; agrupado por número se ve el patrón. Coste: valores escritos en el test |
+| Test singular de las 25 temporadas con `count(distinct)` | `generator` y `left join` | Misma comprobación, más fácil de leer; una temporada ausente no aparece en un `group by` de carreras |
+| Test de tiempos con `warn_if='>0'` y `error_if='>20'` | Siempre `error`; siempre `warn` | `try_cast` evita que un dato malo rompa la carga y el test avisa; unas 20 filas son el 0,2 % de la clasificación; umbral elegido por mí. Los tiempos sí se usan en C1 |
+| Severidad `error` por defecto en el resto de tests | `warn` generalizado | Un resultado histórico que no cuadra invalida el score |
+| Dos unit tests sobre `fct_driver_season` con números exactos | Solo tests de datos | La fórmula del score es el núcleo del caso de uso; los tests de datos no detectan un signo mal puesto |
+| Docs blocks para seis columnas repetidas y `docs-paths: ["docs"]` | Descripción copiada en cada capa; bloques para todas las columnas | Se escribe una vez y se reutiliza; no se usan en los `id_*` porque su significado cambia entre modelos |
 
 
 ## Errores y soluciones (rellenar según aparezcan)
