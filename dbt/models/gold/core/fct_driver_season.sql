@@ -1,0 +1,71 @@
+------------------------------------------------------------
+-- fct_driver_season: score compuesto por piloto y temporada (1 fila por piloto y temporada).
+-- score = (z_c1 - z_c2 + z_c3) / 3  -> pesos exactos de 1/3; C2 resta porque es una tasa de incidentes (peor cuanto mayor).
+-- Los z-scores se calculan dentro de cada temporada y solo con muestras fiables (is_reliable_sample),
+-- para que un piloto con 1 carrera no distorsione la media ni la desviación. Si no es fiable, el score es null.
+------------------------------------------------------------
+
+with c1 as (
+    select id_driver, season_year, n_duels, c1_win_rate
+    from {{ ref('int_f1__driver_season_c1') }}
+),
+
+c2 as (
+    select id_driver, season_year, n_races, n_incidents, c2_incident_rate
+    from {{ ref('int_f1__driver_season_c2') }}
+),
+
+c3 as (
+    select id_driver, season_year, n_races as n_races_valid, c3_positions_vs_car
+    from {{ ref('int_f1__driver_season_c3') }}
+),
+
+-- C2 es la base: tiene una fila por cada piloto que tomó la salida en la temporada
+joined as (
+
+    select
+        c2.id_driver,
+        c2.season_year,
+        c2.n_races,
+        c1.n_duels,
+        c3.n_races_valid,
+        c1.c1_win_rate,
+        c2.c2_incident_rate,
+        c3.c3_positions_vs_car,
+        coalesce(c3.n_races_valid >= 8 and c1.n_duels >= 10, false) as is_reliable_sample
+    from c2
+    left join c1 on c2.id_driver = c1.id_driver and c2.season_year = c1.season_year
+    left join c3 on c2.id_driver = c3.id_driver and c2.season_year = c3.season_year
+
+),
+
+z_scores as (
+
+    select
+        *,
+        (c1_win_rate - avg(case when is_reliable_sample then c1_win_rate end) over (partition by season_year))
+            / nullif(stddev_pop(case when is_reliable_sample then c1_win_rate end) over (partition by season_year), 0) as z_c1,
+        (c2_incident_rate - avg(case when is_reliable_sample then c2_incident_rate end) over (partition by season_year))
+            / nullif(stddev_pop(case when is_reliable_sample then c2_incident_rate end) over (partition by season_year), 0) as z_c2,
+        (c3_positions_vs_car - avg(case when is_reliable_sample then c3_positions_vs_car end) over (partition by season_year))
+            / nullif(stddev_pop(case when is_reliable_sample then c3_positions_vs_car end) over (partition by season_year), 0) as z_c3
+    from joined
+
+)
+
+select
+    md5(concat_ws('|', id_driver, season_year)) as id_driver_season,
+    id_driver,
+    season_year,
+    n_races,
+    n_duels,
+    n_races_valid,
+    is_reliable_sample,
+    c1_win_rate,
+    c2_incident_rate,
+    c3_positions_vs_car,
+    z_c1,
+    z_c2,
+    z_c3,
+    case when is_reliable_sample then (z_c1 - z_c2 + z_c3) / 3 end as score
+from z_scores

@@ -46,9 +46,9 @@ constructor_rank as (
     select
         season_year,
         id_constructor,
-        row_number() over (
+        rank() over (
             partition by season_year
-            order by points desc, wins desc, id_constructor
+            order by points desc, wins desc
         ) as constructor_rank
     from constructor_points
 
@@ -56,7 +56,11 @@ constructor_rank as (
 
 valid_races as (
 
-    select r.id_driver, r.season_year, c.constructor_rank, r.position_order
+    select
+        r.id_driver,
+        r.season_year,
+        r.position_order,
+        avg(r.position_order) over (partition by c.constructor_rank) as expected_position -- media de las posiciones por posicion en la clasificacion de constructores
     from results r
     join constructor_rank c
         on r.season_year = c.season_year
@@ -69,6 +73,6 @@ select
     id_driver,
     season_year,
     count(*) as n_races,
-    avg((2 * constructor_rank - 0.5) - position_order) as c3_positions_vs_car
+    avg(expected_position - position_order) as c3_positions_vs_car
 from valid_races
 group by id_driver, season_year
