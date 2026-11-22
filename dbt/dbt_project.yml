@@ -49,6 +49,15 @@ models:
       +database: "{{ env_var('DBT_SILVER_DB') }}"
       f1:
         +schema: f1
+    # gold
+    gold:
+      +database: "{{ env_var('DBT_GOLD_DB') }}"
+      intermediate:
+        +materialized: view
+        +schema: intermediate
+      core:
+        +materialized: table
+        +schema: core
 
 
 
