@@ -1,4 +1,5 @@
 version: 2
+
 models:
 - name: stg_f1__calendario
   description: "Calendario de carreras de Bronze, uno a uno: renombra y convierte tipos. Una fila por gran premio (1950-2024), con los datos del circuito incluidos."
@@ -10,11 +11,11 @@ models:
         - round
   columns:
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
   - name: round
-    description: "Número de ronda dentro de la temporada."
+    description: '{{ doc("round") }}'
     data_tests:
     - not_null
   - name: race_name
@@ -73,11 +74,11 @@ models:
   description: "Resultados de carrera de Bronze, uno a uno: renombra y convierte tipos. Una fila por piloto y carrera (1950-2024), con los datos del piloto y del constructor incluidos."
   columns:
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
   - name: round
-    description: "Número de ronda dentro de la temporada."
+    description: '{{ doc("round") }}'
     data_tests:
     - not_null
   - name: driver_forename
@@ -111,7 +112,7 @@ models:
   - name: car_number
     description: "Número de coche en la carrera. Nulo si no consta."
   - name: grid
-    description: "Posición de salida. 0 si salió desde el pit lane."
+    description: '{{ doc("grid") }}'
     data_tests:
     - not_null
   - name: position
@@ -127,13 +128,13 @@ models:
     data_tests:
     - not_null
   - name: laps
-    description: "Vueltas completadas."
+    description: '{{ doc("laps") }}'
     data_tests:
     - not_null
   - name: race_time_text
     description: "Tiempo de carrera en texto."
   - name: race_time_ms
-    description: "Tiempo de carrera en milisegundos. Nulo si no lo tiene."
+    description: '{{ doc("race_time_ms") }}'
   - name: fastest_lap
     description: "Vuelta en la que hizo su vuelta rápida."
   - name: fastest_lap_rank
@@ -163,11 +164,11 @@ models:
         - driver_ref
   columns:
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
   - name: round
-    description: "Número de ronda dentro de la temporada."
+    description: '{{ doc("round") }}'
     data_tests:
     - not_null
   - name: driver_forename

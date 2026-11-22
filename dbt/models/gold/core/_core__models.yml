@@ -1,4 +1,5 @@
 version: 2
+
 models:
 - name: fct_driver_season
   description: "Tabla de hechos con el score compuesto de cada piloto y temporada (2000-2024). Una fila por piloto y temporada. Reúne C1 (duelo con el compañero), C2 (incidentes del piloto) y C3 (rendimiento frente al coche). El score es nulo si la muestra no es fiable."
@@ -23,7 +24,7 @@ models:
           to: ref('dim_driver')
           field: id_driver
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -109,7 +110,7 @@ models:
           to: ref('dim_constructor')
           field: id_constructor
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -117,7 +118,7 @@ models:
           min_value: '{{ var(''season_start'') }}'
           max_value: '{{ var(''season_end'') }}'
   - name: round
-    description: "Número de ronda dentro de la temporada."
+    description: '{{ doc("round") }}'
     data_tests:
     - not_null
   - name: quali_position
@@ -129,7 +130,7 @@ models:
   - name: q3_ms
     description: "Mejor tiempo de la Q3 en milisegundos. Nulo si no la disputó o es anterior a 2006."
   - name: grid
-    description: "Posición de salida. 0 si salió desde el pit lane."
+    description: '{{ doc("grid") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -147,7 +148,7 @@ models:
     data_tests:
     - not_null
   - name: status_category
-    description: "Categoría del estado final: finished, mechanical, driver_incident, other_not_finished o not_started."
+    description: '{{ doc("status_category") }}'
     data_tests:
     - not_null
     - accepted_values:
@@ -159,9 +160,9 @@ models:
           - other_not_finished
           - not_started
   - name: laps
-    description: "Vueltas completadas."
+    description: '{{ doc("laps") }}'
   - name: race_time_ms
-    description: "Tiempo de carrera en milisegundos. Nulo si no lo tiene."
+    description: '{{ doc("race_time_ms") }}'
   - name: points
     description: "Puntos de la carrera."
     data_tests:
@@ -287,7 +288,7 @@ models:
     - unique
     - not_null
   - name: season_year
-    description: "Año de la temporada."
+    description: '{{ doc("season_year") }}'
     data_tests:
     - not_null
     - dbt_utils.accepted_range:
@@ -295,7 +296,7 @@ models:
           min_value: '{{ var(''season_start'') }}'
           max_value: '{{ var(''season_end'') }}'
   - name: round
-    description: "Número de ronda dentro de la temporada."
+    description: '{{ doc("round") }}'
     data_tests:
     - not_null
   - name: race_name
@@ -322,3 +323,49 @@ models:
     description: "Longitud."
   - name: circuit_altitude_m
     description: "Altitud en metros."
+
+
+
+unit_tests:
+
+  - name: test_fct_driver_season_score
+    description: "Con dos pilotos fiables (A y B) y uno sin muestra fiable (D), comprueba los z-scores, el score (z_c1 - z_c2 + z_c3) / 3 y que D tiene score nulo sin alterar la media de la temporada."
+    model: fct_driver_season
+    given:
+      - input: ref('int_f1__driver_season_c1')
+        rows:
+          - {id_driver: A, season_year: 2020, n_duels: 20, c1_win_rate: 0.75}
+          - {id_driver: B, season_year: 2020, n_duels: 20, c1_win_rate: 0.25}
+          - {id_driver: D, season_year: 2020, n_duels: 4,  c1_win_rate: 1.0}
+      - input: ref('int_f1__driver_season_c2')
+        rows:
+          - {id_driver: A, season_year: 2020, n_races: 20, n_incidents: 0,  c2_incident_rate: 0.0}
+          - {id_driver: B, season_year: 2020, n_races: 20, n_incidents: 10, c2_incident_rate: 0.5}
+          - {id_driver: D, season_year: 2020, n_races: 12, n_incidents: 9,  c2_incident_rate: 0.75}
+      - input: ref('int_f1__driver_season_c3')
+        rows:
+          - {id_driver: A, season_year: 2020, n_races: 18, c3_positions_vs_car: 3}
+          - {id_driver: B, season_year: 2020, n_races: 18, c3_positions_vs_car: 1}
+          - {id_driver: D, season_year: 2020, n_races: 12, c3_positions_vs_car: 5}
+    expect:
+      rows:
+        - {id_driver: A, season_year: 2020, is_reliable_sample: true,  z_c1: 1, z_c2: -1, z_c3: 1,  score: 1}
+        - {id_driver: B, season_year: 2020, is_reliable_sample: true,  z_c1: -1, z_c2: 1, z_c3: -1, score: -1}
+        - {id_driver: D, season_year: 2020, is_reliable_sample: false, z_c1: 2, z_c2: 2,  z_c3: 3,  score: null}
+
+  - name: test_fct_driver_season_desviacion_cero
+    description: "Con un solo piloto fiable en la temporada la desviación es 0: los z-scores y el score quedan nulos y no hay error de división por cero."
+    model: fct_driver_season
+    given:
+      - input: ref('int_f1__driver_season_c1')
+        rows:
+          - {id_driver: A, season_year: 2021, n_duels: 20, c1_win_rate: 0.75}
+      - input: ref('int_f1__driver_season_c2')
+        rows:
+          - {id_driver: A, season_year: 2021, n_races: 20, n_incidents: 0, c2_incident_rate: 0.0}
+      - input: ref('int_f1__driver_season_c3')
+        rows:
+          - {id_driver: A, season_year: 2021, n_races: 18, c3_positions_vs_car: 3}
+    expect:
+      rows:
+        - {id_driver: A, season_year: 2021, is_reliable_sample: true, z_c1: null, z_c2: null, z_c3: null, score: null}
