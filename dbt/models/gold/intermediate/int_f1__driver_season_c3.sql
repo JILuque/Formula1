@@ -2,7 +2,8 @@
 -- C3: Rendimiento del piloto frente al nivel de su coche.
 -- Nivel del coche = puesto del constructor en el campeonato de esa temporada (se calcula una vez por temporada).
 -- Puntos del constructor = carreras + sprint (reproduce el campeonato oficial de constructores).
--- Puesto esperado = 2 * puesto_constructor - 0.5 (cada equipo tiene 2 coches: el 1.º espera acabar 1.º-2.º, el 2.º 3.º-4.º...).
+-- Los constructores empatados a puntos y victorias comparten puesto (rank), sin orden arbitrario.
+-- Puesto esperado = media de puesto final de los coches de ese puesto de constructor (todas las temporadas 2000-2024).
 -- c3_positions_vs_car = media de (puesto esperado - puesto final): positivo = rinde por encima de su coche.
 -- Opción A: se excluyen carreras con estado mechanical (y not_started). Granularidad: 1 fila por piloto y temporada.
 ------------------------------------------------------------
