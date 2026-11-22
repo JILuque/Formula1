@@ -25,7 +25,11 @@ el modelo ancho que alimenta a `fct_driver_race`. `dbt build` pasa y las cifras 
 con los CSV: 126 pilotos (10.071 carreras con salida y 479 victorias), 38 constructores,
 479 carreras con su circuito, y 10.079 filas en `gold_results__enriched` y
 `fct_driver_race` (9.098 con clasificación y 360 con sprint; 37.069 puntos de carrera,
-558 de sprint y 37.627 en total).
+558 de sprint y 37.627 en total). Documenté todos los modelos con un `.yml` por carpeta, 
+con la descripción de cada modelo y de cada columna: `_f1__models.yml` en `models/staging/f1/` 
+y en `models/silver/f1/`, `_intermediate__models.yml` en `models/gold/intermediate/` y 
+`_core__models.yml` en `models/gold/core/`. `dbt parse` pasa sin errores. Cada columna 
+documentada existe en el SQL de su modelo (comprobado).
  
 **Por qué lo hice así (y qué alternativa descarté):**
 - **Dimensiones con resumen de carrera, no copias de Silver.** `dim_driver` y
@@ -55,14 +59,22 @@ con los CSV: 126 pilotos (10.071 carreras con salida y 479 victorias), 38 constr
   el detalle por carrera para Power BI y para el contraste en bruto.
 - **El `ranking` pasa a leer de `dim_driver`** en vez de Silver: la capa de consumo lee solo
   de Gold.
+  - **Un `.yml` por carpeta, no uno por modelo.** Reúne los modelos de una misma capa y
+  evita decenas de archivos; es la convención del curso (el `.sql` más su `.yml` con
+  descripción, configuración y columnas). El nombre empieza por `_` para que quede arriba
+  en la carpeta.
+- **Las descripciones indican los nulos y las ausencias reales del origen** (por ejemplo,
+  clasificaciones que faltan en 2000-2002, sprint solo en 18 carreras): es lo que
+  preguntaría quien consulte la tabla sin conocer los datos. Sin tests por ahora: se añaden
+  juntos en el día 3. El modelo `ephemeral` de duelos se documenta, pero no admite tests.
+
 **Problemas encontrados y cómo los resolví:**
 - El linaje de dbt mostraba sueltas las tablas de Silver de circuitos, carreras, pilotos y
   constructores: hasta crear las dimensiones no las leía ningún modelo. Tras `dbt compile`
   quedaron conectadas.
-**Pendiente / siguiente paso:** ficheros `.yml` de staging, Silver y Gold (descripciones y
-columnas); tests del día 3 (`unique` y `not_null` en los `id_*`, `relationships` entre los
-hechos y las tres dimensiones, `not_null` en `status_category`, cobertura 2000-2024, tiempos
-perdidos de clasificación).
+**Pendiente / siguiente paso:** tests del día 3 (`unique` y `not_null` en los `id_*`, 
+`relationships` entre los hechos y las tres dimensiones, `not_null` en `status_category`, 
+cobertura 2000-2024, tiempos perdidos de clasificación).
  
 
 ### 2026-11-22: fct_driver_season y ranking
@@ -733,6 +745,7 @@ el 03 para recrear los clones y los permisos.
 | `gold_results__enriched` une carrera, clasificación y sprint | Unir también piloto, equipo y carrera | Esos datos ya están en las dimensiones; las tres sesiones están separadas en Silver a propósito |
 | `left join` desde `results` en el `enriched` | `inner join` | Faltan clasificaciones (981 filas) y el sprint solo existe en 18 carreras; con `inner` se perderían filas |
 | `fct_driver_race` con `total_points` y `coalesce(sprint_points, 0)` | Sumar sin `coalesce` | `null + número` da `null`: se perdería el total en carreras sin sprint |
+| Un `.yml` por carpeta con descripción de modelos y columnas, sin tests hasta el día 3 | Un `.yml` por modelo; tests desde el principio | Menos archivos y misma convención en todas las capas; los tests se añaden juntos al ver cómo los pide el curso |
 
 
 ## Errores y soluciones (rellenar según aparezcan)

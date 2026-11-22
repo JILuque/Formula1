@@ -1,0 +1,155 @@
+version: 2
+
+models:
+
+  - name: fct_driver_season
+    description: "Tabla de hechos con el score compuesto de cada piloto y temporada (2000-2024). Una fila por piloto y temporada. Reúne C1 (duelo con el compañero), C2 (incidentes del piloto) y C3 (rendimiento frente al coche). El score es nulo si la muestra no es fiable."
+    columns:
+      - name: id_driver_season
+        description: "Clave de la fila: md5 de piloto y temporada."
+      - name: id_driver
+        description: "Piloto. Apunta a dim_driver."
+      - name: season_year
+        description: "Año de la temporada."
+      - name: n_races
+        description: "Carreras en las que tomó la salida (excluye not_started)."
+      - name: n_duels
+        description: "Duelos válidos con su compañero de equipo (carrera, clasificación y sprint). Nulo si no tuvo ninguno."
+      - name: n_races_valid
+        description: "Carreras válidas para C3 (excluye averías y no salidas). Nulo si todas fueron por avería."
+      - name: is_reliable_sample
+        description: "Verdadero si tiene al menos 8 carreras válidas y 10 duelos. Solo estas filas entran en el cálculo de los z-scores y tienen score."
+      - name: c1_win_rate
+        description: "C1: proporción de duelos ganados al compañero de equipo (0 a 1)."
+      - name: c2_incident_rate
+        description: "C2: incidentes atribuibles al piloto (accidentes y salidas de pista) por carrera con salida. Más es peor."
+      - name: c3_positions_vs_car
+        description: "C3: posiciones ganadas respecto al puesto esperado para su coche. Positivo = rinde por encima de su coche."
+      - name: z_c1
+        description: "C1 estandarizado dentro de su temporada (pasos típicos sobre la media de los pilotos fiables)."
+      - name: z_c2
+        description: "C2 estandarizado dentro de su temporada. Se resta en el score."
+      - name: z_c3
+        description: "C3 estandarizado dentro de su temporada."
+      - name: score
+        description: "Score compuesto (z_c1 - z_c2 + z_c3) / 3, con pesos de 1/3. Nulo si la muestra no es fiable."
+
+  - name: fct_driver_race
+    description: "Tabla de hechos con una fila por piloto y carrera (2000-2024): resultado de la carrera, clasificación y sprint de ese fin de semana. Se alimenta de gold_results__enriched."
+    columns:
+      - name: id_driver_race
+        description: "Clave de la fila: md5 de carrera y piloto."
+      - name: id_race
+        description: "Carrera. Apunta a dim_race."
+      - name: id_driver
+        description: "Piloto. Apunta a dim_driver."
+      - name: id_constructor
+        description: "Constructor con el que corrió la carrera. Apunta a dim_constructor."
+      - name: season_year
+        description: "Año de la temporada."
+      - name: round
+        description: "Número de ronda dentro de la temporada."
+      - name: quali_position
+        description: "Posición en la clasificación. Nulo si no hay clasificación (faltan algunas de 2000-2002)."
+      - name: q1_ms
+        description: "Mejor tiempo de la Q1 en milisegundos. Nulo si no hay dato."
+      - name: q2_ms
+        description: "Mejor tiempo de la Q2 en milisegundos. Nulo si no la disputó o es anterior a 2006."
+      - name: q3_ms
+        description: "Mejor tiempo de la Q3 en milisegundos. Nulo si no la disputó o es anterior a 2006."
+      - name: grid
+        description: "Posición de salida. 0 si salió desde el pit lane."
+      - name: position_order
+        description: "Orden final en la carrera, definido también para los que no terminaron."
+      - name: is_classified
+        description: "Verdadero si tiene posición oficial en la carrera."
+      - name: status_category
+        description: "Categoría del estado final: finished, mechanical, driver_incident, other_not_finished o not_started."
+      - name: laps
+        description: "Vueltas completadas."
+      - name: race_time_ms
+        description: "Tiempo de carrera en milisegundos. Nulo si no lo tiene."
+      - name: points
+        description: "Puntos de la carrera."
+      - name: sprint_points
+        description: "Puntos del sprint. 0 si no hubo sprint."
+      - name: total_points
+        description: "Puntos de carrera más puntos de sprint."
+      - name: sprint_position_order
+        description: "Orden final en el sprint. Nulo si no hubo sprint."
+
+  - name: dim_driver
+    description: "Dimensión de pilotos (2000-2024). Una fila por piloto con sus datos y un resumen de su carrera en el periodo, calculado con las carreras en las que tomó la salida."
+    columns:
+      - name: id_driver
+        description: "Clave del piloto: md5 de su referencia."
+      - name: driver_ref
+        description: "Referencia corta del piloto en el origen."
+      - name: driver_full_name
+        description: "Nombre y apellidos."
+      - name: driver_dob
+        description: "Fecha de nacimiento."
+      - name: driver_code
+        description: "Código de tres letras. Nulo en pilotos que no lo tienen."
+      - name: driver_nationality
+        description: "Nacionalidad."
+      - name: first_season_year
+        description: "Primera temporada con carrera en 2000-2024."
+      - name: last_season_year
+        description: "Última temporada con datos en 2000-2024."
+      - name: n_seasons
+        description: "Temporadas en las que corrió."
+      - name: n_races
+        description: "Carreras con salida."
+      - name: n_wins
+        description: "Victorias de carrera."
+      - name: n_podiums
+        description: "Podios en carrera."
+
+  - name: dim_constructor
+    description: "Dimensión de constructores (2000-2024). Una fila por constructor con sus datos y un resumen de su participación."
+    columns:
+      - name: id_constructor
+        description: "Clave del constructor: md5 de su referencia."
+      - name: constructor_ref
+        description: "Referencia corta del constructor en el origen."
+      - name: constructor_name
+        description: "Nombre del constructor."
+      - name: constructor_nationality
+        description: "Nacionalidad."
+      - name: first_season_year
+        description: "Primera temporada con carrera en 2000-2024."
+      - name: last_season_year
+        description: "Última temporada con datos en 2000-2024."
+      - name: n_seasons
+        description: "Temporadas en las que participó."
+      - name: n_wins
+        description: "Victorias de carrera de cualquiera de sus pilotos."
+
+  - name: dim_race
+    description: "Dimensión de carreras (2000-2024). Una fila por carrera con los datos del circuito incluidos (desnormalizada)."
+    columns:
+      - name: id_race
+        description: "Clave de la carrera: md5 de temporada y ronda."
+      - name: season_year
+        description: "Año de la temporada."
+      - name: round
+        description: "Número de ronda dentro de la temporada."
+      - name: race_name
+        description: "Nombre del gran premio."
+      - name: race_date
+        description: "Fecha de la carrera."
+      - name: has_sprint
+        description: "Verdadero si ese fin de semana hubo sprint."
+      - name: circuit_name
+        description: "Nombre del circuito."
+      - name: circuit_location
+        description: "Localidad del circuito."
+      - name: circuit_country
+        description: "País del circuito."
+      - name: circuit_lat
+        description: "Latitud."
+      - name: circuit_lng
+        description: "Longitud."
+      - name: circuit_altitude_m
+        description: "Altitud en metros."

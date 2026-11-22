@@ -1,0 +1,111 @@
+version: 2
+
+models:
+
+  - name: int_f1__teammate_duels
+    description: "Duelos entre compañeros de equipo (base de C1). Ephemeral: no crea objeto en Snowflake. Cada duelo genera dos filas, una desde cada piloto, en carrera, clasificación y sprint. Excluye averías y no salidas (carrera y sprint) y los pilotos sin tiempo de Q1 en clasificación."
+    columns:
+      - name: id_race
+        description: "Carrera. Apunta a dim_race."
+      - name: season_year
+        description: "Año de la temporada."
+      - name: session_type
+        description: "Sesión del duelo: race, qualifying o sprint."
+      - name: id_constructor
+        description: "Equipo que comparten los dos pilotos en esa sesión."
+      - name: id_driver
+        description: "Piloto desde cuyo punto de vista se mira el duelo."
+      - name: id_rival
+        description: "Compañero de equipo con el que se compara."
+      - name: win_duel
+        description: "Verdadero si id_driver acaba por delante de id_rival en esa sesión."
+
+  - name: int_f1__driver_season_c1
+    description: "C1: duelo con el compañero de equipo. Una fila por piloto y temporada con el porcentaje de duelos ganados (carrera, clasificación y sprint juntos)."
+    columns:
+      - name: id_driver
+        description: "Piloto. Apunta a dim_driver."
+      - name: season_year
+        description: "Año de la temporada."
+      - name: n_duels
+        description: "Duelos válidos disputados."
+      - name: n_wins
+        description: "Duelos ganados."
+      - name: c1_win_rate
+        description: "Proporción de duelos ganados (0 a 1). Va con signo positivo en el score."
+
+  - name: int_f1__driver_season_c2
+    description: "C2: incidentes atribuibles al piloto. Una fila por piloto y temporada con la tasa de carreras con salida que acabaron por accidente o salida de pista."
+    columns:
+      - name: id_driver
+        description: "Piloto. Apunta a dim_driver."
+      - name: season_year
+        description: "Año de la temporada."
+      - name: n_races
+        description: "Carreras en las que tomó la salida (excluye not_started; incluye las que acabó por avería)."
+      - name: n_incidents
+        description: "Carreras acabadas con estado driver_incident."
+      - name: c2_incident_rate
+        description: "Incidentes por carrera con salida. Va con signo negativo en el score: más es peor."
+
+  - name: int_f1__driver_season_c3
+    description: "C3: rendimiento frente al nivel del coche. Una fila por piloto y temporada con la media de posiciones ganadas respecto al puesto esperado para su coche. El nivel del coche es el puesto del constructor en el campeonato de esa temporada (puntos de carrera más sprint, empates con el mismo puesto)."
+    columns:
+      - name: id_driver
+        description: "Piloto. Apunta a dim_driver."
+      - name: season_year
+        description: "Año de la temporada."
+      - name: n_races
+        description: "Carreras válidas (excluye averías y no salidas)."
+      - name: c3_positions_vs_car
+        description: "Media de (puesto esperado para su coche - puesto final). Positivo = rinde por encima de su coche."
+
+  - name: gold_results__enriched
+    description: "Modelo ancho: una fila por piloto y carrera (mismo grano que slv_f1__results) con la clasificación y el sprint de ese fin de semana ya unidos. Alimenta a fct_driver_race. Clasificación y sprint pueden ser nulos."
+    columns:
+      - name: id_race
+        description: "Carrera. Apunta a dim_race."
+      - name: id_driver
+        description: "Piloto. Apunta a dim_driver."
+      - name: id_constructor
+        description: "Constructor con el que corrió la carrera. Si cambió de equipo entre clasificación y carrera, manda el de la carrera."
+      - name: season_year
+        description: "Año de la temporada."
+      - name: round
+        description: "Número de ronda dentro de la temporada."
+      - name: car_number
+        description: "Número de coche en la carrera."
+      - name: quali_position
+        description: "Posición en la clasificación. Nulo si no hay clasificación."
+      - name: q1_ms
+        description: "Mejor tiempo de la Q1 en milisegundos."
+      - name: q2_ms
+        description: "Mejor tiempo de la Q2 en milisegundos. Nulo antes de 2006 o si no la disputó."
+      - name: q3_ms
+        description: "Mejor tiempo de la Q3 en milisegundos. Nulo antes de 2006 o si no la disputó."
+      - name: grid
+        description: "Posición de salida. 0 si salió desde el pit lane."
+      - name: position
+        description: "Posición oficial en la carrera. Nulo si no fue clasificado."
+      - name: position_order
+        description: "Orden final en la carrera, definido también para los que no terminaron."
+      - name: is_classified
+        description: "Verdadero si tiene posición oficial en la carrera."
+      - name: points
+        description: "Puntos de la carrera."
+      - name: laps
+        description: "Vueltas completadas."
+      - name: race_time_ms
+        description: "Tiempo de carrera en milisegundos. Nulo si no lo tiene."
+      - name: status
+        description: "Estado final de la carrera en texto."
+      - name: status_category
+        description: "Categoría del estado final: finished, mechanical, driver_incident, other_not_finished o not_started."
+      - name: sprint_grid
+        description: "Posición de salida en el sprint. Nulo si no hubo sprint."
+      - name: sprint_position_order
+        description: "Orden final en el sprint. Nulo si no hubo sprint."
+      - name: sprint_points
+        description: "Puntos del sprint. Nulo si no hubo sprint."
+      - name: sprint_status_category
+        description: "Categoría del estado final en el sprint. Nulo si no hubo sprint."
