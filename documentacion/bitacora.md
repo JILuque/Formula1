@@ -17,6 +17,54 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-22: dimensiones, gold_results__enriched y fct_driver_race
+**Qué hice:** completé el modelo dimensional de Gold. En `models/gold/core/` creé las
+tres dimensiones (`dim_driver`, `dim_constructor`, `dim_race`) y la segunda tabla de
+hechos, `fct_driver_race`; en `models/gold/intermediate/` creé `gold_results__enriched`,
+el modelo ancho que alimenta a `fct_driver_race`. `dbt build` pasa y las cifras cuadran
+con los CSV: 126 pilotos (10.071 carreras con salida y 479 victorias), 38 constructores,
+479 carreras con su circuito, y 10.079 filas en `gold_results__enriched` y
+`fct_driver_race` (9.098 con clasificación y 360 con sprint; 37.069 puntos de carrera,
+558 de sprint y 37.627 en total).
+ 
+**Por qué lo hice así (y qué alternativa descarté):**
+- **Dimensiones con resumen de carrera, no copias de Silver.** `dim_driver` y
+  `dim_constructor` unen la entidad de Silver con un resumen calculado desde
+  `slv_f1__results` (primera temporada, temporadas, victorias; en pilotos también carreras
+  y podios). Es desnormalizar: datos y historial en una sola fila. Las medidas de carrera
+  dentro de una dimensión no son lo más purista (irían en una tabla agregada), pero son
+  atributos de carrera del piloto y el contraste en bruto del ranking las necesita.
+- **`dim_race` con el circuito incluido** (nombre, país, coordenadas, altitud), en lugar de
+  una `dim_circuit` aparte: quien consulta una carrera no necesita un segundo `join`.
+  Mismo caso que `dim_users` con `dim_addresses` en el ejercicio del curso.
+- **`gold_results__enriched` une carrera, clasificación y sprint del mismo fin de semana**,
+  no los datos del piloto, el equipo y la carrera: esos ya viven en las dimensiones y
+  repetirlos duplicaría información. Hace de las tres tablas de Silver, que se dejaron
+  separadas a propósito, una fila por piloto y carrera.
+- **`left join` desde `results`** en el `enriched`: la carrera manda y la clasificación y el
+  sprint pueden faltar (981 filas sin clasificación, la mayoría por los fines de semana de
+  2000-2002 sin ella; el sprint solo existe en 18 carreras). Con `inner join` se perderían.
+  Se comprobó que ninguna fila de clasificación ni de sprint se queda sin pareja.
+- **Si el equipo cambia entre clasificación y carrera** (10 filas), manda el de la carrera.
+- **`fct_driver_race` toma del `enriched` solo las claves y las medidas**, como
+  `fct_orders` toma de `gold_orders__enriched` en el curso. `total_points` suma carrera y
+  sprint, con `coalesce(sprint_points, 0)`: sin él, `null + número` borraría el total en las
+  carreras sin sprint.
+- **Dos tablas de hechos** (`fct_driver_season` y `fct_driver_race`) con dimensiones
+  compartidas, como se decidió. El score del caso de uso sale de la primera; la segunda es
+  el detalle por carrera para Power BI y para el contraste en bruto.
+- **El `ranking` pasa a leer de `dim_driver`** en vez de Silver: la capa de consumo lee solo
+  de Gold.
+**Problemas encontrados y cómo los resolví:**
+- El linaje de dbt mostraba sueltas las tablas de Silver de circuitos, carreras, pilotos y
+  constructores: hasta crear las dimensiones no las leía ningún modelo. Tras `dbt compile`
+  quedaron conectadas.
+**Pendiente / siguiente paso:** ficheros `.yml` de staging, Silver y Gold (descripciones y
+columnas); tests del día 3 (`unique` y `not_null` en los `id_*`, `relationships` entre los
+hechos y las tres dimensiones, `not_null` en `status_category`, cobertura 2000-2024, tiempos
+perdidos de clasificación).
+ 
+
 ### 2026-11-22: fct_driver_season y ranking
 **Qué hice:** creé `fct_driver_season` en `models/gold/core/` (tabla, una fila por
 piloto y temporada) y la consulta `analyses/ranking.sql`. La tabla reúne C1, C2 y
@@ -680,6 +728,11 @@ el 03 para recrear los clones y los permisos.
 | `fct_driver_season` con C2 como base y `left join` | `full outer join`; `inner join` | C2 tiene una fila por piloto que tomó la salida; los que faltan en C1 o C3 no son fiables |
 | Ranking como consulta (`analyses`), media ponderada por carreras | Tabla `ranking`; media simple | El top es un filtro; una temporada larga debe pesar más que una corta |
 | C1 sin ponderar por la calidad del compañero | Ponderar por el C3 del rival; ratings tipo Elo | Fuera del alcance en el plazo; se documenta como limitación y trabajo futuro |
+| `dim_driver` y `dim_constructor` con resumen de carrera | Copiar la entidad de Silver tal cual | Es desnormalizar; el contraste en bruto necesita victorias y podios por piloto. Las medidas en una dimensión no son lo más purista: se defienden como atributos de carrera |
+| `dim_race` con el circuito incluido | `dim_race` y `dim_circuit` separadas | Una fila por carrera sin segundo `join`; mismo caso que `dim_users` con `dim_addresses` |
+| `gold_results__enriched` une carrera, clasificación y sprint | Unir también piloto, equipo y carrera | Esos datos ya están en las dimensiones; las tres sesiones están separadas en Silver a propósito |
+| `left join` desde `results` en el `enriched` | `inner join` | Faltan clasificaciones (981 filas) y el sprint solo existe en 18 carreras; con `inner` se perderían filas |
+| `fct_driver_race` con `total_points` y `coalesce(sprint_points, 0)` | Sumar sin `coalesce` | `null + número` da `null`: se perdería el total en carreras sin sprint |
 
 
 ## Errores y soluciones (rellenar según aparezcan)
