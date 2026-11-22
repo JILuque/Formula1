@@ -6,7 +6,7 @@ models:
     description: "Tabla de hechos con el score compuesto de cada piloto y temporada (2000-2024). Una fila por piloto y temporada. Reúne C1 (duelo con el compañero), C2 (incidentes del piloto) y C3 (rendimiento frente al coche). El score es nulo si la muestra no es fiable."
     columns:
       - name: id_driver_season
-        description: "Clave de la fila: md5 de piloto y temporada."
+        description: "Clave de la fila: clave sustituta de piloto y temporada."
       - name: id_driver
         description: "Piloto. Apunta a dim_driver."
       - name: season_year
@@ -38,7 +38,7 @@ models:
     description: "Tabla de hechos con una fila por piloto y carrera (2000-2024): resultado de la carrera, clasificación y sprint de ese fin de semana. Se alimenta de gold_results__enriched."
     columns:
       - name: id_driver_race
-        description: "Clave de la fila: md5 de carrera y piloto."
+        description: "Clave de la fila: clave sustituta de carrera y piloto."
       - name: id_race
         description: "Carrera. Apunta a dim_race."
       - name: id_driver
@@ -82,7 +82,7 @@ models:
     description: "Dimensión de pilotos (2000-2024). Una fila por piloto con sus datos y un resumen de su carrera en el periodo, calculado con las carreras en las que tomó la salida."
     columns:
       - name: id_driver
-        description: "Clave del piloto: md5 de su referencia."
+        description: "Clave del piloto: clave sustituta de su referencia."
       - name: driver_ref
         description: "Referencia corta del piloto en el origen."
       - name: driver_full_name
@@ -110,7 +110,7 @@ models:
     description: "Dimensión de constructores (2000-2024). Una fila por constructor con sus datos y un resumen de su participación."
     columns:
       - name: id_constructor
-        description: "Clave del constructor: md5 de su referencia."
+        description: "Clave del constructor: clave sustituta de su referencia."
       - name: constructor_ref
         description: "Referencia corta del constructor en el origen."
       - name: constructor_name
@@ -130,7 +130,7 @@ models:
     description: "Dimensión de carreras (2000-2024). Una fila por carrera con los datos del circuito incluidos (desnormalizada)."
     columns:
       - name: id_race
-        description: "Clave de la carrera: md5 de temporada y ronda."
+        description: "Clave de la carrera: clave sustituta de temporada y ronda."
       - name: season_year
         description: "Año de la temporada."
       - name: round
