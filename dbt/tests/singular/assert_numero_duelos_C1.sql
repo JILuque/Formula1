@@ -3,6 +3,7 @@
 -- Por tanto, en cada temporada, las victorias suman la mitad de los duelos.
 -- Si no cuadra, algún duelo se ha contado en un solo sentido
 ---------------------------------------------------------------------------------
+{{ config(group='analitica_f1') }}
 
 select
     season_year
