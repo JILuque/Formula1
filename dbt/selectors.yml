@@ -1,0 +1,23 @@
+selectors:
+  - name: capa_silver
+    description: Todos los modelos de Silver.
+    definition:
+      method: tag
+      value: silver
+
+  - name: ranking_f1
+    description: fct_driver_season y todo lo que necesita (caso de uso del mejor piloto).
+    definition:
+      method: fqn
+      value: fct_driver_season
+      parents: true
+
+  - name: diario_sin_snapshots
+    description: Todo el proyecto salvo los snapshots, para el job diario de PRO.
+    definition:
+      union:
+        - method: fqn
+          value: "*"
+        - exclude:
+            - method: resource_type
+              value: snapshot

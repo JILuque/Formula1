@@ -7,5 +7,5 @@ from {{ ref('fct_driver_season') }} f
 join {{ ref('dim_driver') }} d on f.id_driver = d.id_driver
 where f.score is not null
 group by d.driver_full_name
-having sum(f.n_races) >= 100
+having sum(f.n_races) >={{ var('min_career_races') }}
 order by score desc
