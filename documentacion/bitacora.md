@@ -17,6 +17,85 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-23: día 6 (variables, generate_schema_name del curso, tags y selectors)
+**Qué hice:**
+- **Variables del score en `dbt_project.yml`:** `min_valid_races: 8`, `min_duels: 10` y
+  `min_career_races: 100`, junto a `season_start` y `season_end`. Ahora `is_reliable_sample`
+  de `fct_driver_season` usa `var('min_valid_races')` y `var('min_duels')`, y los dos
+  `analyses` del ranking usan `var('min_career_races')`. Los dos unit tests de
+  `fct_driver_season` fijan `min_valid_races` y `min_duels` con `overrides: vars:`.
+- **`generate_schema_name` del curso**, que sustituye a la del día 4: con `target.name` en
+  `dev` o `pro` (y fuera de CI) usa el schema tal cual (`CORE`); en el resto, el IDE incluido,
+  usa `target.schema` + `_` + el schema (`DBT_ILUQUE_CORE`). El primer `dbt build` creó
+  `DBT_ILUQUE_F1`, `_SEEDS`, `_SNAPSHOTS`, `_CORE` e `_INTERMEDIATE`; el build completo dio
+  verde y el ranking quedó igual. Los schemas antiguos `F1`, `SEEDS`, `SNAPSHOTS`,
+  `CORE` e `INTERMEDIATE` se borran.]
+- **Tags por capa** en `dbt_project.yml` (`staging`, `silver`, `gold`, `intermediate` y
+  `core`). Tags creados y resultado de `dbt ls --select tag:silver` (7 modelos) y
+  `tag:core` (5).
+- **`selectors.yml`**. 
+- **No implementado:** el hook `on-run-end` con `log_run_summary`, los hooks de modelo, los
+  secretos `DBT_ENV_SECRET_` y subir la config común de Silver a `dbt_project.yml`.
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- **Umbrales como `var()` y bases de datos como `env_var()`.** Los umbrales son una decisión
+  metodológica del proyecto y valen igual en todos los entornos, así que van en `vars`. Lo que
+  cambia entre DEV y PRO (las bases de datos) sigue en `env_var`. Los valores no cambian: son
+  los que ya usaba el score, ahora a la vista y sin repetirse en tres ficheros. Además puedo
+  ejecutar `dbt build --select fct_driver_season --vars '{min_valid_races: 6, min_duels: 8}'`
+  y ver si el top 5 se mueve, que es una prueba de sensibilidad para la defensa. [Completar:
+  resultado de esa prueba, si la hago; después hay que reconstruir con los valores por
+  defecto.]
+- **Los pesos del score (1/3 cada uno) no son variables.** Convertirlos cambiaría la fórmula
+  y los unit tests, y "pesos iguales" se defiende mejor como decisión fija.
+- **Unit tests con las variables fijadas.** Si alguien cambia `min_duels` en el proyecto, el
+  piloto D del test (4 duelos) podría pasar a ser fiable y el test fallaría sin cambiar el
+  código. Con `overrides` el test comprueba la fórmula, no la configuración.
+- **Límite de las variables:** solo valen en modelos que se reconstruyen enteros, como Gold.
+  En un incremental, cambiar la variable no reprocesaría las temporadas ya cargadas.
+- **Por qué cambié la macro del día 4.** La versión del día 4 quitaba siempre el prefijo,
+  incluso en el IDE. Con un solo desarrollador era suficiente, pero el IDE y el despliegue
+  escribían en los mismos schemas de la misma base de datos. Con la del curso, el IDE usa
+  schemas personales y los jobs con target `dev` y `pro` escriben en schemas limpios; además
+  DEV y PRO siguen separados por base de datos. La decisión del día 4 sigue en esta bitácora
+  con su fecha: la regla cambia, el registro de por qué se tomó se queda.
+- **Cambios respecto a la macro del curso:** quité `pre` de la lista porque solo tengo `dev` y
+  `pro`. Mantengo la comprobación de CI aunque no tengo jobs de CI: no estorba y evita que un
+  CI futuro escriba en schemas compartidos.
+- **No hice el hook `on-run-end`.** dbt ya imprime al final `PASS`, `WARN`, `ERROR` y `TOTAL`,
+  y el resumen que se proponía repetía esos números. Solo habría aportado el nombre del
+  entorno y la separación entre modelos y tests. Una alternativa que sí aportaba algo era
+  listar los nombres de los nodos con warn, pero no es necesaria. Los hooks de modelo
+  (`pre_hook` y `post_hook`) tampoco: ningún modelo depende de un parámetro de sesión, y un
+  hook sin uso es difícil de defender.
+- **Tags y selectors.** Los tags se heredan por carpeta y los voy a usar para elegir qué
+  ejecuta cada job (`tag:silver`, `tag:core`). Un selector con nombre solo se justifica donde
+  la selección no cabe en un tag: el job diario sin snapshots. Con dos jobs, `dbt build
+  --exclude resource_type:snapshot` también habría bastado.
+- **Qué no moví:** la config común de Silver (`materialized` y `on_schema_change`) sigue en
+  cada modelo.
+
+**Cosas que aprendí:**
+- En el IDE, `target.name` es `default`, así que la rama de schemas limpios de la macro nunca
+  se activa ahí. Para probarla sin jobs hay que cambiar temporalmente la lista de targets y
+  usar solo `dbt ls`, nunca `build`. La rama de CI no se puede probar desde el IDE.
+- El nombre del target de cada job, que se fija en dbt Platform, decide qué rama de la macro
+  se usa: tiene que ser exactamente `dev` o `pro`.
+- El comentario de cabecera de la macro estaba desactualizado (decía que nunca había prefijo).
+  Lo cambié para describir los tres casos.
+- Cambiar la macro cambió la ubicación del snapshot: `DBT_ILUQUE_SNAPSHOTS` empezó con una sola
+  versión por estado. La historia de la prueba de `Retired` quedó en el schema antiguo, que era
+  una demostración.
+
+**Problemas encontrados y cómo los resolví:** el comentario de cabecera de la macro seguía
+describiendo la versión anterior; lo corregí.
+
+**Pendiente / siguiente paso:** pull request de DEV a `main`; día 7: entornos `dev` y `pro` y
+jobs, con el target de cada job como `dev` o `pro` (así se comprueba en la práctica la rama
+limpia de la macro) y un job aparte para `dbt snapshot`.
+
+---
+
 ### 2026-11-23: día 5 (on_schema_change y snapshot de la clasificación de estados)
 **Qué hice:**
 - **`on_schema_change='fail'`** en la config de los 7 modelos incrementales de Silver
@@ -33,8 +112,8 @@ Fecha de entrega: 25 de noviembre de 2026.
   a ejecutar `dbt seed` y `dbt snapshot` y comprobé que `Retired` tenía dos versiones: la
   antigua con `dbt_valid_to` y la nueva vigente. Para ver el efecto en el ranking reconstruí
   Silver con `dbt build --full-refresh --select slv_f1__results+ slv_f1__sprint_results+`.
-  Comprobamos el efecto en el top 10 del ranking al pasar `Retired` a `mechanical`.
-  Cambiamos el seed devuelta a `other_not_finished` y ranking igual que antes de la prueba.
+  [Completar: efecto en el top 10 del ranking al pasar `Retired` a `mechanical`.]
+  [Confirmar: seed devuelta a `other_not_finished` y ranking igual que antes de la prueba.]
 
 **Por qué lo hice así (y qué alternativa descarté):**
 - **`on_schema_change='fail'` en lugar del valor por defecto (`ignore`).** Con `ignore`, si
@@ -1062,6 +1141,11 @@ el 03 para recrear los clones y los permisos.
 | Sin microbatch ni `full_refresh: false` | Microbatch por año; proteger los incrementales | Los hechos no tienen columna de fecha y los z-scores se calculan por temporada; la demo y los cambios de clasificación necesitan `--full-refresh` |
 | Snapshot de la seed `status_classification` con `check` sobre `status_category` | Snapshot de pilotos o resultados; estrategia `timestamp`; no hacer snapshot | Los datos de F1 no cambian; la clasificación es la única regla mía que cambia y mueve el score; la seed no tiene columna de última modificación. Ningún modelo lo lee: es una tabla de auditoría |
 | Snapshot con `hard_deletes: new_record` y `+transient: false` | `ignore` (defecto); tabla transient | Un estado borrado de la seed queda registrado; la historia no se puede reconstruir desde Bronze y necesita Fail-safe |
+| Umbrales del score (`min_valid_races`, `min_duels`, `min_career_races`) como `var()` | Escribirlos en el SQL; también convertir los pesos en variables | Decisión metodológica común a todos los entornos; permite probar la sensibilidad del ranking con `--vars`. Los pesos se quedan fijos |
+| Unit tests de `fct_driver_season` con `overrides: vars:` | Dejar que lean el valor del proyecto | Comprueban la fórmula, no la configuración |
+| `generate_schema_name` del curso (schema limpio con target `dev` o `pro`, prefijo en el IDE) | Mantener la del día 4 (nunca prefijo) | Separa el desarrollo en el IDE del despliegue en los jobs; conserva la separación DEV/PRO por base de datos. Sin `pre`; con la rama de CI aunque no haya jobs de CI |
+| Sin `on-run-end` ni hooks de modelo | `log_run_summary`; `pre_hook` y `post_hook` | dbt ya imprime PASS/WARN/ERROR; ningún modelo depende de un parámetro de sesión |
+| Tags por capa y dominio, y selector solo para el job diario sin snapshots | Selectors para cada capa; no usar selectors | Los tags cubren la selección de los jobs; el selector se justifica solo donde un tag no basta |
 
 
 ## Errores y soluciones (rellenar según aparezcan)
