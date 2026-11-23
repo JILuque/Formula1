@@ -17,6 +17,90 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-23: día 5 (on_schema_change y snapshot de la clasificación de estados)
+**Qué hice:**
+- **`on_schema_change='fail'`** en la config de los 7 modelos incrementales de Silver
+  (`slv_f1__circuits`, `constructors`, `drivers`, `races`, `results`, `qualifying` y
+  `sprint_results`). No cambia ninguna columna, así que `dbt build --select silver+` pasa
+  sin `--full-refresh`.
+- **Snapshot `status_classification_snapshot`** sobre la seed `status_classification`
+  (`snapshots/_snapshots.yml`): `unique_key: status`, `strategy: check`,
+  `check_cols: [status_category]` y `hard_deletes: new_record`. En `dbt_project.yml`, el
+  apartado `snapshots` lleva `+database: DBT_SILVER_DB`, `+schema: snapshots` y
+  `+transient: false`; con `generate_schema_name`, el schema es `SNAPSHOTS` sin prefijo.
+- **Prueba con historia real.** Ejecuté `dbt seed` y `dbt snapshot` con la seed original
+  (versión 1 de cada estado), cambié `Retired` de `other_not_finished` a `mechanical`, volví
+  a ejecutar `dbt seed` y `dbt snapshot` y comprobé que `Retired` tenía dos versiones: la
+  antigua con `dbt_valid_to` y la nueva vigente. Para ver el efecto en el ranking reconstruí
+  Silver con `dbt build --full-refresh --select slv_f1__results+ slv_f1__sprint_results+`.
+  Comprobamos el efecto en el top 10 del ranking al pasar `Retired` a `mechanical`.
+  Cambiamos el seed devuelta a `other_not_finished` y ranking igual que antes de la prueba.
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- **`on_schema_change='fail'` en lugar del valor por defecto (`ignore`).** Con `ignore`, si
+  añado o quito una columna del `select` de un modelo incremental, dbt no toca la tabla y
+  no avisa: los datos quedarían incoherentes sin que se note. Con `fail` el modelo se para y
+  me obliga a decidir con `--full-refresh`, que es lo que ya me pasó al cambiar a
+  `generate_surrogate_key`. Descarté `append_new_columns` (el valor de la diapositiva): la
+  columna nueva existiría solo en las temporadas reprocesadas y sería nula en el resto. La
+  comparación es entre la tabla existente y el `select` del modelo, no con los datos de
+  Bronze, así que salta cuando cambio yo el código; los datos nuevos con una columna de más
+  no llegan a Silver (el `COPY INTO` de Bronze falla antes y staging lista las columnas una a
+  una). Protege de mis propios cambios, más que de la fuente.
+- **Snapshot de la seed y no de los datos de F1.** Los datos de carreras, pilotos y
+  resultados son históricos y no cambian: un snapshot no guardaría ninguna historia. Lo que
+  sí cambia por decisión mía es la clasificación de estados, y cada cambio mueve el score
+  (por ejemplo, `Retired` son 76 filas, el 0,75 % de los resultados, y pasarlas a
+  `mechanical` las saca de los duelos de C1 y de C3). El snapshot responde a "¿qué regla
+  estaba vigente y desde cuándo?". Es una pieza de gobierno del dato, no un requisito del
+  caso de uso: ningún modelo lee del snapshot, queda como tabla de auditoría.
+- **`strategy: check` y no `timestamp`:** la seed no tiene una columna fiable de última
+  modificación. Se compara `status_category`, lo único que puede cambiar.
+- **`hard_deletes: new_record`:** si quito un estado de la seed, la versión se cierra y queda
+  constancia del borrado, en lugar de seguir vigente.
+- **`+transient: false`:** una tabla transient no tiene Fail-safe y la historia del snapshot
+  no se puede reconstruir desde Bronze.
+- **Objeción conocida:** el CSV de la seed ya está en Git, que guarda cada cambio con autor y
+  fecha. El snapshot aporta que la historia se puede consultar con SQL junto a los datos y
+  que registra cuándo se aplicó el cambio en el warehouse, no cuándo se hizo el commit. Es
+  una justificación válida pero no una necesidad fuerte.
+- **El lookback ya estaba.** El filtro `season_year >= (select max(season_year) from
+  {{ this }})` reprocesa la última temporada cargada por si hay correcciones, y el `merge` actualiza en
+  lugar de duplicar: es el lookback de la diapositiva, con la temporada como unidad en vez de
+  una hora de `date_load`.
+- **Por qué `merge` y no las otras estrategias:** `append` duplicaría la temporada que se
+  relee; `delete+insert` también serviría, pero `merge` es la estrategia vista en clase y las
+  claves son estables; `insert_overwrite` en Snowflake sobrescribe la tabla entera.
+- **Qué descarté del día 5:**
+  - Deduplicar el lote con `qualify row_number()`: en 2000-2024 el origen no repite filas, los
+    tests `unique` de los `id_*` lo vigilan y Snowflake falla con un error si el `merge`
+    encuentra claves duplicadas, así que no pasarían en silencio.
+  - Microbatch: necesita una columna de fecha en el modelo y en su upstream, y los hechos de
+    Silver solo tienen `season_year`; los z-scores se calculan por temporada, así que un lote
+    por periodo interferiría; y reprocesar un periodo ya lo cubre el `>=`.
+  - `full_refresh: false`: la demo del incremental y los cambios de clasificación necesitan
+    `--full-refresh`.
+  - El ejercicio de `append` frente a `delete+insert` (modelos temporales sin uso en el
+    proyecto).
+
+**Cosas que aprendí:**
+- **Cambiar la seed no cambia Silver.** `status_category` se calcula en Silver, que es
+  incremental y solo reprocesa la última temporada, así que las 24 anteriores conservan la
+  categoría vieja hasta un `--full-refresh`. Con la seed cambiada y sin reconstruir, la seed y
+  Silver dicen cosas distintas y el ranking sigue reflejando la regla anterior.
+- **Un snapshot solo ve el estado en el momento en que se ejecuta.** Si cambio la seed y la
+  devuelvo a su valor sin ejecutar `dbt snapshot` entre medias, el cambio intermedio no
+  queda registrado. Cada ejecución que detecta una diferencia cierra la versión vigente y abre
+  otra; no se borra nada, así que cambiar y revertir deja tres versiones.
+
+**Problemas encontrados y cómo los resolví:** ninguno.
+
+**Pendiente / siguiente paso:** pull request de DEV a `main`; más adelante, entornos y jobs
+en PRO (con `dbt snapshot` en el job y la historia del snapshot de PRO empezando en su primera
+ejecución). Opcional: `agg_driver_career`, `groups` y `access`, Power BI.
+
+---
+
 ### 2026-11-23: día 4 (generate_schema_name, owner y macro z_score)
 **Qué hice:** apliqué del día 4 lo que tiene sentido en este proyecto.
 - **Macro `generate_schema_name`** (`macros/generate_schema_name.sql`), con la versión del curso:
@@ -972,6 +1056,12 @@ el 03 para recrear los clones y los permisos.
 | Sin `dbt_utils.star`, sin `obtener_valores` y sin test genérico `positive_values` | Aplicar todos los ejercicios del día 4 | No hay caso real en el proyecto; `accepted_range` ya cubre `positive_values` y `run_query` ya está en las macros de la demo |
 | `groups`, `access` y contratos fuera del alcance | Declarar `intermediate` como `private` y `core` como `public` | Mejora de gobierno sin impacto en el resultado; se cita como trabajo futuro |
 | Ranking en bruto = victorias (desempate por podios) frente al ajustado | Puntos; puestos del campeonato | Los puntos no son comparables entre 2000 y 2024 por los cambios de sistema; las victorias son lo más intuitivo |
+| `on_schema_change='fail'` en los 7 modelos incrementales de Silver | `ignore` (defecto); `append_new_columns` | Con `ignore` una columna nueva no se crea y no avisa; con `append_new_columns` quedaría nula en las temporadas no reprocesadas. `fail` me obliga a decidir con `--full-refresh` |
+| Lookback por temporada (`>=` sobre la última temporada cargada) con `merge` | Lookback de una hora sobre `date_load`; `append`; `delete+insert` | La carga es estática y la unidad natural del dato es la temporada; `append` duplicaría lo que se relee y `merge` es la estrategia vista en clase |
+| Sin deduplicar el lote en los hechos de Silver | `qualify row_number()` en `results`, `qualifying` y `sprint_results` | El origen es único en 2000-2024, los `unique` lo vigilan y Snowflake falla si el `merge` encuentra claves duplicadas |
+| Sin microbatch ni `full_refresh: false` | Microbatch por año; proteger los incrementales | Los hechos no tienen columna de fecha y los z-scores se calculan por temporada; la demo y los cambios de clasificación necesitan `--full-refresh` |
+| Snapshot de la seed `status_classification` con `check` sobre `status_category` | Snapshot de pilotos o resultados; estrategia `timestamp`; no hacer snapshot | Los datos de F1 no cambian; la clasificación es la única regla mía que cambia y mueve el score; la seed no tiene columna de última modificación. Ningún modelo lo lee: es una tabla de auditoría |
+| Snapshot con `hard_deletes: new_record` y `+transient: false` | `ignore` (defecto); tabla transient | Un estado borrado de la seed queda registrado; la historia no se puede reconstruir desde Bronze y necesita Fail-safe |
 
 
 ## Errores y soluciones (rellenar según aparezcan)

@@ -1,0 +1,9 @@
+snapshots:
+  - name: status_classification_snapshot
+    description: "Historial de la clasificación de estados (seed status_classification). Cada vez que cambia la categoría de un estado, se cierra la versión anterior (dbt_valid_to) y se abre la nueva. La versión vigente tiene dbt_valid_to nulo."
+    relation: ref('status_classification')
+    config:
+      unique_key: status
+      strategy: check
+      check_cols: [status_category]
+      hard_deletes: new_record

@@ -76,7 +76,12 @@ seeds:
         status_category: varchar(30)
 
 ### SNAPSHOTS
-
+snapshots:
+  f1:
+    +database: "{{ env_var('DBT_SILVER_DB') }}"
+    +schema: snapshots
+    +transient: false
+    
 ### VARS
 vars:
   season_start: 2000
