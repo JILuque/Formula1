@@ -41,22 +41,27 @@ models:
   f1:
     # staging
     staging:
+      +tags: ['staging']
       +materialized: view
       +database: "{{ env_var('DBT_SILVER_DB') }}"
       f1:
         +schema: f1
     # silver
     silver:
+      +tags: ['silver']
       +database: "{{ env_var('DBT_SILVER_DB') }}"
       f1:
         +schema: f1
     # gold
     gold:
+      +tags: ['gold']
       +database: "{{ env_var('DBT_GOLD_DB') }}"
       intermediate:
+        +tags: ['intermediate']
         +materialized: view
         +schema: intermediate
       core:
+        +tags: ['core']
         +materialized: table
         +schema: core
         +meta:
