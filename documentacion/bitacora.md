@@ -17,6 +17,116 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-23: día 4 (generate_schema_name, owner y macro z_score)
+**Qué hice:** apliqué del día 4 lo que tiene sentido en este proyecto.
+- **Macro `generate_schema_name`** (`macros/generate_schema_name.sql`), con la versión del curso:
+  usa solo el schema indicado en `+schema`, sin el prefijo de la conexión. Antes del cambio,
+  `show schemas in database DEV_SILVER_DB` mostraba `DBT_ILUQUE`, `DBT_ILUQUE_F1` y
+  `DBT_ILUQUE_SEEDS`: las tablas estaban con prefijo, no en `f1` como decían las entradas
+  anteriores. Después de `dbt build` aparecen `F1`, `SEEDS`, `CORE` e `INTERMEDIATE`, y el
+  build pasa en verde. Borrados los schemas antiguos con prefijo.
+- **`meta.owner` en `dbt_project.yml`**: `owner: "equipo-analitica-f1"` en la carpeta
+  `gold/core`. Aparece en los metadatos de los modelos en `dbt docs`.
+- **Macro `z_score`** (`macros/z_score.sql`), con `column_name` y dos parámetros con valor por
+  defecto (`partition_by='season_year'` y `reliable_flag='is_reliable_sample'`). En
+  `fct_driver_season`, los tres z-scores pasan de tres bloques copiados a
+  `{{ z_score('c1_win_rate') }}`, `{{ z_score('c2_incident_rate') }}` y
+  `{{ z_score('c3_positions_vs_car') }}`. Comprobé que el SQL compilado es el mismo (salvo
+  espacios), que los dos unit tests pasan y que el ranking no cambia (Alonso 0,85, Max
+  Verstappen 0,82, Hamilton 0,53 y Vettel 0,50).
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- **`generate_schema_name` sin prefijo.** El comportamiento por defecto de dbt (`schema de la
+  conexión` + `_` + `schema del modelo`) protege a un equipo que comparte una base de datos de
+  desarrollo. Mi caso es otro: trabajo solo y los entornos ya se separan por base de datos
+  (`DEV_*` y `PRO_*`, con variables de entorno). Sin la macro, producción habría heredado el
+  prefijo del entorno de despliegue, que no controlo. Con ella, los schemas se llaman igual en
+  DEV y en PRO. Coste asumido: los schemas antiguos con prefijo quedan como copias obsoletas y
+  se borran a mano. Descarté dejar el comportamiento por defecto.
+- **`owner` solo en Gold y solo en `core`**, como en el proyecto de clase, donde solo los
+  modelos de Gold llevaban propietario. El propietario responde por los datos que consume el
+  usuario final (dimensiones y hechos); `intermediate` son pasos de cálculo y staging y Silver
+  son capas internas. El valor es un equipo y no una persona: es un rol, y si el proyecto
+  cambiara de manos no habría que tocar nada. El nombre del equipo es una decisión mía.
+- **Macro `z_score` porque el cálculo estaba escrito tres veces.** Es el criterio de las
+  diapositivas: una macro merece la pena cuando la misma lógica se repite (principio DRY: si
+  cambia la fórmula, se cambia en un solo sitio). El refactor era seguro porque los unit tests
+  del día 3 comprueban la fórmula y el caso de desviación 0, y el SQL compilado no cambia. Los
+  parámetros por defecto evitan repetir lo que es igual en las tres llamadas.
+- **Qué descarté del día 4:**
+  - Una macro para el filtro de temporadas de Silver (el mismo bloque con `between var(...)` e
+    `is_incremental()` está en 7 modelos): es DRY real, pero toca 7 modelos que ya funcionan;
+    queda como mejora.
+  - Una macro para el filtro de estados (`not in ('mechanical', 'not_started')`): solo se usa
+    3 veces y el SQL directo se lee mejor.
+  - `dbt_utils.star`: ningún modelo selecciona "todas las columnas menos algunas".
+  - `obtener_valores` y las columnas dinámicas: no pivoto datos, y `run_query` ya se usa en las
+    macros de la demo del incremental.
+  - Un test genérico `positive_values`: `dbt_utils.accepted_range` ya hace esa comprobación, y
+    las propias diapositivas piden mirar primero si el paquete la tiene.
+  - `groups`, `access` y contratos de modelo: quedan como mejora futura (por ejemplo, declarar
+    `private` los modelos de `intermediate` para que solo `core` sea accesible desde fuera).
+- **Gobierno del dato en el proyecto**, con los tres pilares de la diapositiva: calidad (data
+  tests, tests singulares y unit tests), linaje (el DAG de dbt, de Bronze a `core`) y catálogo
+  (descripciones, docs blocks y `meta.owner` en la documentación generada).
+
+**Problemas encontrados y cómo los resolví:**
+- Las entradas anteriores decían que las vistas de staging estaban en el schema `f1`. Era
+  inexacto: dbt las creaba en `DBT_ILUQUE_F1`. Lo detecté con `show schemas` antes de aplicar
+  la macro y lo dejo anotado aquí; las entradas antiguas no se reescriben.
+
+**Pendiente / siguiente paso:** pull request de DEV a `main`; más adelante, entornos y jobs
+(PRO). Opcional: macro para el filtro de temporadas de Silver, `agg_driver_career`, `groups` y
+`access`, Power BI.
+
+---
+
+### 2026-11-22: contraste entre el ranking en bruto y el ajustado
+**Qué hice:** creé `analyses/ranking_bruto_vs_ajustado.sql`, que compara, para los mismos
+pilotos que `ranking.sql` (score en temporadas fiables y mínimo de 100 carreras: 33 pilotos), el
+puesto según las victorias y el puesto según el score. Lee solo de `dim_driver` y
+`fct_driver_season`; no hay modelos nuevos. Devuelve victorias, podios, porcentaje de
+victorias, score, `puesto_bruto`, `puesto_ajustado` y `diferencia` (puesto bruto menos puesto
+ajustado: positivo si el ajuste lo sube).
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- **Es el contrapunto del caso de uso.** La pregunta es quién es el mejor piloto
+  independientemente del coche; para justificar el método hay que enseñar qué saldría sin él.
+- **El "bruto" son las victorias** (con los podios como desempate), con `rank()`: los
+  empatados comparten puesto. Descarté los puntos porque el sistema de puntuación cambió en
+  2000-2024 y no son comparables entre años.
+- **Mismos pilotos en los dos rankings**, para que la diferencia de puestos tenga sentido. Las
+  victorias y carreras de `dim_driver` cuentan todas las temporadas, también las no fiables:
+  es lo que vería cualquiera sin el método.
+
+**Resultado (33 pilotos):** la correlación entre los dos órdenes es de 0,58: el coche explica
+una parte importante del ranking en bruto, pero no todo. Solo 6 de los 10 primeros del ranking
+ajustado están entre los 10 primeros en bruto, y 11 pilotos se mueven 10 puestos o más.
+- **El top 4 apenas cambia:** Alonso 5.º → 1.º, Max Verstappen 2.º → 2.º, Hamilton 1.º → 3.º y
+  Vettel 4.º → 4.º.
+- **Suben los de pocas victorias:** Gasly (+18, de 23.º a 5.º), Heidfeld (+15), Russell (+14),
+  Hülkenberg (+14), Albon (+13) y Norris (+12).
+- **Bajan los de coche de equipo grande, casi todos con un campeón de compañero:** Massa (-17),
+  Coulthard (-13), Ralf Schumacher (-13), Barrichello (-12), Michael Schumacher (-10) y Pérez
+  (-9).
+
+**Limitaciones a tener presentes en la defensa:**
+- **Los puestos bajos del bruto son poco informativos:** muchos pilotos tienen 0 victorias y se
+  desempatan por podios, así que parte del salto de Hülkenberg o Heidfeld es el orden del
+  desempate. Se interpreta la dirección y el tamaño del cambio, no el puesto exacto.
+- **C1 no pondera la calidad del compañero y C3 tiene techo en los coches de arriba:** empuja
+  hacia abajo a quienes compartieron equipo con un campeón (Barrichello, Massa). Es la
+  limitación documentada del día 22.
+- **Gasly** depende de tres temporadas con AlphaTauri (muestra pequeña) y **Schumacher** sale
+  13.º por la ventana 2000-2024 y el techo del coche.
+- El score mide rendimiento relativo a su coche y su compañero, no el mejor piloto de la
+  historia.
+
+**Pendiente / siguiente paso:** decidir cómo presentarlo en la defensa (qué tabla enseñar y
+cuántos pilotos) y, si da tiempo, `agg_driver_career` para tener el ranking como tabla.
+
+---
+
 ### 2026-11-22: día 3 (dbt_utils, tests, unit tests y docs blocks)
 **Qué hice:** seguí las diapositivas del día 3 sobre el proyecto.
 - **Paquete `dbt_utils`.** Creé `packages.yml` (`dbt-labs/dbt_utils`, versión `>=1.3.0,<2.0.0`),
@@ -27,7 +137,7 @@ Fecha de entrega: 25 de noviembre de 2026.
   `dbt build` pasa.
 - **Tests de datos (unas 205 comprobaciones):** Silver 71, staging 23, Gold 111 (core 67 e
   intermediate 44). `dbt build --select staging` y `dbt build --select gold` pasan.
-  [Confirmar: `dbt build --select silver`.]
+  Los tests de Silver pasan en el `dbt build` completo.
 - **Tests singulares** en `tests/singular/` (`dbt test --select test_type:singular` pasa):
   `assert_cobertura_temporadas` (hay las 25 temporadas), `assert_cobertura_carreras` (cada
   temporada tiene exactamente las carreras del calendario oficial, 479 en total),
@@ -40,8 +150,8 @@ Fecha de entrega: 25 de noviembre de 2026.
   quedan nulos sin error de división.
 - **Docs blocks.** Creé `docs/f1/_f1__docs.md` con seis bloques (`season_year`, `round`,
   `grid`, `laps`, `race_time_ms` y `status_category`) y los usé con `doc()` en 43 columnas;
-  añadí `docs-paths: ["docs"]` a `dbt_project.yml`. [Confirmar: `dbt parse`, `dbt build` y
-  `dbt docs generate` tras este cambio.]
+  añadí `docs-paths: ["docs"]` a `dbt_project.yml`. `dbt parse`, `dbt build` y
+  `dbt docs generate` pasan tras este cambio.
 - Unifiqué los nombres de los `.yml`: `_staging_f1__models.yml`, `_silver_f1__models.yml`,
   `_intermediate__models.yml` y `_core__models.yml`.
 
@@ -855,6 +965,13 @@ el 03 para recrear los clones y los permisos.
 | Severidad `error` por defecto en el resto de tests | `warn` generalizado | Un resultado histórico que no cuadra invalida el score |
 | Dos unit tests sobre `fct_driver_season` con números exactos | Solo tests de datos | La fórmula del score es el núcleo del caso de uso; los tests de datos no detectan un signo mal puesto |
 | Docs blocks para seis columnas repetidas y `docs-paths: ["docs"]` | Descripción copiada en cada capa; bloques para todas las columnas | Se escribe una vez y se reutiliza; no se usan en los `id_*` porque su significado cambia entre modelos |
+| Macro `generate_schema_name` sin prefijo | Comportamiento por defecto (`schema de la conexión` + `_` + `schema del modelo`) | El prefijo protege a quien comparte base de datos de desarrollo; aquí los entornos ya se separan por base de datos y en PRO el prefijo vendría del entorno de despliegue. Coste: borrar a mano los schemas antiguos |
+| `meta.owner` solo en `gold/core`, con un equipo como valor | Owner en todas las capas; una persona como owner | Como en el proyecto de clase, solo los modelos que consume el usuario final tienen propietario; un rol no cambia si cambia quien lo ejerce |
+| Macro `z_score` con parámetros por defecto | Tres bloques copiados en `fct_driver_season` | Mismo cálculo tres veces: DRY. Refactor seguro porque los unit tests comprueban la fórmula y el SQL compilado no cambia |
+| No hacer macro del filtro de temporadas de Silver ni del filtro de estados | Una macro para cada uno | La de Silver toca 7 modelos que ya funcionan; la de estados se usa 3 veces y el SQL directo se lee mejor. Quedan como mejora |
+| Sin `dbt_utils.star`, sin `obtener_valores` y sin test genérico `positive_values` | Aplicar todos los ejercicios del día 4 | No hay caso real en el proyecto; `accepted_range` ya cubre `positive_values` y `run_query` ya está en las macros de la demo |
+| `groups`, `access` y contratos fuera del alcance | Declarar `intermediate` como `private` y `core` como `public` | Mejora de gobierno sin impacto en el resultado; se cita como trabajo futuro |
+| Ranking en bruto = victorias (desempate por podios) frente al ajustado | Puntos; puestos del campeonato | Los puntos no son comparables entre 2000 y 2024 por los cambios de sistema; las victorias son lo más intuitivo |
 
 
 ## Errores y soluciones (rellenar según aparezcan)

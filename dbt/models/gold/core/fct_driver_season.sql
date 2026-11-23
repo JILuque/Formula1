@@ -43,12 +43,9 @@ z_scores as (
 
     select
         *,
-        (c1_win_rate - avg(case when is_reliable_sample then c1_win_rate end) over (partition by season_year))
-            / nullif(stddev_pop(case when is_reliable_sample then c1_win_rate end) over (partition by season_year), 0) as z_c1,
-        (c2_incident_rate - avg(case when is_reliable_sample then c2_incident_rate end) over (partition by season_year))
-            / nullif(stddev_pop(case when is_reliable_sample then c2_incident_rate end) over (partition by season_year), 0) as z_c2,
-        (c3_positions_vs_car - avg(case when is_reliable_sample then c3_positions_vs_car end) over (partition by season_year))
-            / nullif(stddev_pop(case when is_reliable_sample then c3_positions_vs_car end) over (partition by season_year), 0) as z_c3
+        {{ z_score('c1_win_rate') }} as z_c1,
+        {{ z_score('c2_incident_rate') }} as z_c2,
+        {{ z_score('c3_positions_vs_car') }} as z_c3
     from joined
 
 )
