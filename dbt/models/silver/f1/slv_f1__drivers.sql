@@ -1,7 +1,8 @@
 {{ config(
     materialized='incremental',
     incremental_strategy='merge',
-    unique_key='id_driver'
+    unique_key='id_driver',
+    on_schema_change='fail'
 ) }}
 
 with results as (

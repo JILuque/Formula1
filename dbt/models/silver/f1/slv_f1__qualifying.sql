@@ -1,7 +1,8 @@
 {{ config(
     materialized='incremental',
     incremental_strategy='merge',
-    unique_key='id_qualifying'
+    unique_key='id_qualifying',
+    on_schema_change='fail'
 ) }}
 
 with qualifying as (
