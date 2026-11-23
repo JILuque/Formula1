@@ -1,25 +1,8 @@
 version: 2
 
 models:
-- name: int_f1__teammate_duels
-  description: "Duelos entre compañeros de equipo (base de C1). Ephemeral: no crea objeto en Snowflake. Cada duelo genera dos filas, una desde cada piloto, en carrera, clasificación y sprint. Excluye averías y no salidas (carrera y sprint) y los pilotos sin tiempo de Q1 en clasificación."
-  columns:
-  - name: id_race
-    description: "Carrera. Apunta a dim_race."
-  - name: season_year
-    description: '{{ doc("season_year") }}'
-  - name: session_type
-    description: "Sesión del duelo: race, qualifying o sprint."
-  - name: id_constructor
-    description: "Equipo que comparten los dos pilotos en esa sesión."
-  - name: id_driver
-    description: "Piloto desde cuyo punto de vista se mira el duelo."
-  - name: id_rival
-    description: "Compañero de equipo con el que se compara."
-  - name: win_duel
-    description: "Verdadero si id_driver acaba por delante de id_rival en esa sesión."
 - name: int_f1__driver_season_c1
-  description: "C1: duelo con el compañero de equipo. Una fila por piloto y temporada con el porcentaje de duelos ganados (carrera, clasificación y sprint juntos)."
+  description: "C1: duelo con el compañero de equipo. Una fila por piloto y temporada con el porcentaje de duelos ganados (carrera, clasificación y sprint juntos). Los duelos se calculan dentro del propio modelo: cada duelo genera dos filas, una desde cada piloto, y se excluyen averías y no salidas (carrera y sprint) y los pilotos sin tiempo de Q1 en clasificación."
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:

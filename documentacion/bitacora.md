@@ -17,6 +17,164 @@ Fecha de entrega: 25 de noviembre de 2026.
 
 ## Entradas
 
+### 2026-11-23: día 8 (groups, access, grants, exposure y contrato)
+**Qué hice:**
+- **Grupo `analitica_f1`** en `models/_groups.yml`, con un único propietario. Asignado a todo
+  Gold con `+group` en `dbt_project.yml`.
+- **`+access: private` en `gold/intermediate` y `+access: public` en `gold/core`.** Staging y
+  Silver se quedan en `protected` (por defecto).
+- **Grants declarativos:** `+grants: select: ['REPORTING_ROLE']` en `gold/core`. Compruebo con
+  `show grants on table …DIM_DRIVER`. `REPORTING_ROLE` aparece con `SELECT`.
+- **Permisos de lectura para `REPORTING_ROLE` en PRO** (rol dado a mi usuario, uso del warehouse,
+  de `PRO_GOLD_DB` y de sus schemas, también los futuros) con `SECURITYADMIN`. Ejecutado, 
+  y consulta de `FCT_DRIVER_SEASON` con `REPORTING_ROLE` en PRO.
+- **Exposure `ranking_mejor_piloto`** de tipo `analysis`, que depende de `fct_driver_season` y
+  `dim_driver`. Fichero creado y `dbt build --select +exposure:ranking_mejor_piloto`
+  en verde.
+- **Contrato en `fct_driver_season`:** `contract: enforced: true`, con el `data_type` de las 14
+  columnas sacado de `describe table` y `not_null` como constraint en las seis columnas que ya
+  tenían ese test. `dbt test --select test_type:unit` en verde y ranking sin cambios (Alonso
+  0,85, Max Verstappen 0,82, Hamilton 0,53, Vettel 0,50).
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- **Un solo grupo.** Solo hay un equipo. `private` en los `int` no restringe a nadie dentro del
+  proyecto, pero deja escrita la intención: los `int` no son para consumir desde fuera, y lo que
+  se consume está en `core`. Conservo `meta.owner` del día 4 como catálogo.
+- **Los grants van declarados y no con `run-operation`.** Se aplican en cada construcción, también
+  cuando `table` recrea las tablas. `REPORTING_ROLE` necesitaba además uso del warehouse y de la
+  base y los schemas, que el script 01 no le daba; los concedo una vez con `SECURITYADMIN`.
+- **Exposure de tipo `analysis` y no `dashboard`.** No he hecho el Power BI: no me sentía
+  confiado con lo explicado en clase, y Power BI Desktop solo funciona en Windows. Declarar un
+  dashboard que no existe sería deshonesto. Si lo hago, cambio una palabra.
+- **El contrato solo en `fct_driver_season`.** Es la tabla que consume el ranking y la que
+  merece una garantía de forma. Los demás modelos de `core` suman unas 40 columnas más y no tienen
+  consumidores externos; el beneficio no compensa el trabajo ni el riesgo de errores de tipos.
+  Los tests siguen: de las constraints solo `not_null` la aplica Snowflake, la unicidad la
+  garantizan los tests.
+- **Versiones de modelo: no.** No hay consumidores a los que dar tiempo para migrar, y una
+  `deprecation_date` en un proyecto con un solo propietario sería de adorno.
+- **CI con `state:modified+`.Requiere la integración nativa de GitHub, 
+   una ejecución previa del job de PRO como estado de
+  comparación y un job en DEV con target `ci`. Mantuve la salvaguarda de CI en
+  `generate_schema_name`, así que estaría lista.
+
+**Cosas que aprendí:**
+- Un test singular que lee un modelo `private` falla en el `parse`: tiene que pertenecer al grupo
+  del modelo. La solución es asignarle el grupo con `{{ config(group='analitica_f1') }}`, no
+  abrir el acceso.
+- `_groups.yml` tiene que estar dentro de `models/`; en la raíz del proyecto dbt no lo lee y da
+  "Invalid group … expected one of...".
+- En un contrato, `varchar` sin longitud no coincide con `varchar(32)`: hay que copiar el tipo
+  exacto del `describe table`.
+
+**Problemas encontrados y cómo los resolví:**
+- `Parsing Error … attempted to reference node … int_f1__driver_season_c1 … private to the
+  'analitica_f1' group` en `assert_numero_duelos_C1`: añadí `{{ config(group='analitica_f1') }}`
+  al test.
+- `Invalid group 'analitica_f1', expected one of []`: había creado `_groups.yml` en la raíz del
+  proyecto en lugar de en `models/`. Lo moví.
+
+**Pendiente / siguiente paso:** pull request a `main`, ejecutar el job de PRO, comprobar la
+lectura con `REPORTING_ROLE`, decidir si hago el CI, y cerrar la bitácora con los resultados
+marcados.
+
+---
+
+### 2026-11-23: duelos de compañeros dentro de C1 (un solo modelo)
+**Qué hice:**
+- **Uní `int_f1__teammate_duels` en `int_f1__driver_season_c1`.** Los duelos pasan a ser dos
+  CTE de C1 (`sessions` y `duels`) y el modelo agrega al final. Borré el fichero
+  `int_f1__teammate_duels.sql` y su bloque de `_intermediate__models.yml`; la descripción de
+  C1 ahora explica cómo se calculan los duelos. No hay nada que borrar en Snowflake, porque el
+  modelo era `ephemeral` y no creaba ningún objeto.
+- **Comprobación:** `dbt parse` sin errores, `sum(n_duels)` igual antes y después
+  del cambio, `dbt build --select int_f1__driver_season_c1+` en verde (con
+  `assert_numero_duelos_C1` y los dos unit tests) y ranking sin cambios (Alonso 0,85,
+  Max Verstappen 0,82, Hamilton 0,53, Vettel 0,50).
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- **Un solo modelo en lugar de dos.** Comenté con otra profesora el diseño de los dos `int`
+  consecutivos. Ya había dejado el de duelos como `ephemeral` por la primera sugerencia del
+  profesorado (un `int` que lee de otro `int` es poco limpio). Ella lo ve bien, pero opina
+  que, si solo se necesita en un sitio, es mejor un solo `int`. Los duelos solo los lee C1.
+- **Es el mismo SQL.** Un modelo `ephemeral` se inyecta como CTE en el modelo que lo usa, así
+  que unirlos compila a la misma consulta y los datos no cambian. Tampoco se pierde
+  testabilidad: un `ephemeral` ya no se podía testear por separado.
+- **La razón del 21 de noviembre ya no se sostiene.** Entonces descarté unirlos porque
+  "mezcla dos responsabilidades" y porque la tabla de duelos podría servir a otros análisis.
+  Hoy ningún otro modelo la usa; los duelos son un paso interno de C1, y la responsabilidad del
+  modelo es "C1 por piloto y temporada". Si algún día otro criterio necesita los duelos, se
+  vuelve a separar (esta decisión sustituye a la anterior, que sigue en la bitácora con su fecha).
+- **`duels` solo conserva `season_year`, `id_driver` y `win_duel`.** Son las únicas columnas
+  que C1 usa después; `id_race`, `session_type`, `id_constructor` e `id_rival` solo hacían
+  falta para el emparejamiento.
+- **Lo que no toqué:** `gold_results__enriched`, que alimenta a `fct_driver_race`, es un `int`
+  que lo lee un modelo de `core`, no dos `int` seguidos.
+
+**Cosas que aprendí:** un modelo `ephemeral` es una forma de separar el código sin crear un
+objeto, pero si solo lo lee otro modelo, separarlo en dos ficheros añade un nodo al linaje sin
+ganar nada.
+
+**Problemas encontrados y cómo los resolví:** ninguno.
+
+**Pendiente / siguiente paso:** confirmar la comprobación de arriba; después, día 8 (groups y
+access, grants para `REPORTING_ROLE`, exposure y contrato en `fct_driver_season`).
+
+---
+
+### 2026-11-23: día 7 (entornos DEV y PRO, jobs y camino a PRO)
+**Qué hice:**
+- **Entornos de despliegue `DEV` (General) y `PRO` (Production)** en dbt Platform, ambos leyendo
+  la rama `main`, con credenciales de par de claves, `DEV_TRANSFORM_ROLE` y `PRO_TRANSFORM_ROLE`,
+  el warehouse `WH_PROYECTO` y el schema `dbt_jobs`. Variables `DBT_BRONZE_DB`, `DBT_SILVER_DB` y
+  `DBT_GOLD_DB` con valores `DEV_*` en DEV y `PRO_*` en PRO. Conexión probada en los
+  dos entornos y versión de dbt igual en ambos.
+- **Comprobé los permisos de `PRO_TRANSFORM_ROLE` en Snowflake:** uso de `PRO_BRONZE_DB` y de sus
+  schemas, `select` en las tres tablas, creación de schemas en `PRO_SILVER_DB` y `PRO_GOLD_DB`
+  y uso del warehouse. Recuentos de `PRO_BRONZE_DB` (calendario 1125, resultados 26759,
+  clasificación 10494).
+- **Job de PRO con `dbt build`**, creado con un compañero de clase. Target name `pro`,
+  freshness desactivado, "generate docs" activado y aviso por correo si falla.
+  El job de DEV y encadenamiento, si lo creo; resultado de la ejecución de PRO
+  (`show schemas in database PRO_GOLD_DB` debe dar `CORE` e `INTERMEDIATE`) y ranking en PRO igual
+  que en el IDE.
+
+**Por qué lo hice así (y qué alternativa descarté):**
+- **Dos entornos y no tres.** Es un proyecto en solitario, así que no hay PRE. Las bases `PRE_*`
+  existen por el script 01, pero no se usan. DEV y PRO se separan por base de datos y por rol:
+  el rol de DEV no puede escribir en PRO.
+- **Un solo `dbt build` por job, con el snapshot dentro.** Había pensado un selector aparte para
+  ejecutar el snapshot en otro job. Lo descarté porque `dbt build` ya incluye los snapshots y el
+  DAG ejecuta primero la seed y después el snapshot, que depende de ella; si la seed no cambia, el
+  snapshot no crea versiones nuevas. Un job aparte añadía complejidad sin motivo.
+- **Sin freshness.** Bronze se cargó una vez y es estático, así que el paso de freshness del job
+  no aporta nada. Es la misma decisión que ya constaba en la bitácora.
+- **Sin cron.** No hay nada que recargar a diario. Si el job de PRO va detrás del de DEV, la
+  promoción es por cadena: si DEV falla, PRO no se toca.
+- **A PRO solo se llega por merge a `main` y jobs.** No ejecuto `dbt run` contra PRO desde el IDE:
+  un job deja log, artefactos y quién lo lanzó, usa credenciales de servicio y lo que llega ha
+  pasado por un pull request. En este proyecto, mi usuario hace de desarrollador y de usuario de
+  los jobs porque es una cuenta de prueba; en un proyecto real serían usuarios de servicio.
+- **No implementé la `run-operation` de permisos.** Los permisos con `grant select on all tables`
+  se pierden cuando `table` recrea las tablas, así que habría que relanzarla después de cada
+  build. El día 8 trae los grants declarativos, que se aplican solos.
+- **Qué descarté del día 7:** PRE, el paso de freshness, la orquestación según el estado (la
+  diapositiva dice que es solo para conocerla) y la demo de `dbt retry` con un permiso revocado.
+
+**Cosas que aprendí:**
+- El nombre del target de cada job decide qué rama de `generate_schema_name` se usa; con `default`
+  los modelos de PRO acabarían como `DBT_JOBS_CORE` en lugar de `CORE`.
+- Los entornos de despliegue leen `main`, no mi rama `DEV`: hasta que el pull request está
+  fusionado, los jobs no ven mis cambios.
+- Las variables de entorno por entorno solo se pueden rellenar cuando los entornos ya existen.
+
+**Problemas encontrados y cómo los resolví:** ninguno.
+
+**Pendiente / siguiente paso:** ejecutar el job de PRO con todo fusionado en `main` y comprobar
+schemas, ranking y lectura con `REPORTING_ROLE`.
+
+---
+
 ### 2026-11-23: día 6 (variables, generate_schema_name del curso, tags y selectors)
 **Qué hice:**
 - **Variables del score en `dbt_project.yml`:** `min_valid_races: 8`, `min_duels: 10` y
@@ -28,12 +186,11 @@ Fecha de entrega: 25 de noviembre de 2026.
   `dev` o `pro` (y fuera de CI) usa el schema tal cual (`CORE`); en el resto, el IDE incluido,
   usa `target.schema` + `_` + el schema (`DBT_ILUQUE_CORE`). El primer `dbt build` creó
   `DBT_ILUQUE_F1`, `_SEEDS`, `_SNAPSHOTS`, `_CORE` e `_INTERMEDIATE`; el build completo dio
-  verde y el ranking quedó igual. Los schemas antiguos `F1`, `SEEDS`, `SNAPSHOTS`,
-  `CORE` e `INTERMEDIATE` se borran.]
+  verde y el ranking quedó igual. Schemas antiguos `F1`, `SEEDS`, `SNAPSHOTS`,
+  `CORE` e `INTERMEDIATE` borrados.
 - **Tags por capa** en `dbt_project.yml` (`staging`, `silver`, `gold`, `intermediate` y
   `core`). Tags creados y resultado de `dbt ls --select tag:silver` (7 modelos) y
   `tag:core` (5).
-- **`selectors.yml`**. 
 - **No implementado:** el hook `on-run-end` con `log_run_summary`, los hooks de modelo, los
   secretos `DBT_ENV_SECRET_` y subir la config común de Silver a `dbt_project.yml`.
 
@@ -43,9 +200,7 @@ Fecha de entrega: 25 de noviembre de 2026.
   cambia entre DEV y PRO (las bases de datos) sigue en `env_var`. Los valores no cambian: son
   los que ya usaba el score, ahora a la vista y sin repetirse en tres ficheros. Además puedo
   ejecutar `dbt build --select fct_driver_season --vars '{min_valid_races: 6, min_duels: 8}'`
-  y ver si el top 5 se mueve, que es una prueba de sensibilidad para la defensa. [Completar:
-  resultado de esa prueba, si la hago; después hay que reconstruir con los valores por
-  defecto.]
+  y ver si el top 5 se mueve, que es una prueba de sensibilidad para la defensa.
 - **Los pesos del score (1/3 cada uno) no son variables.** Convertirlos cambiaría la fórmula
   y los unit tests, y "pesos iguales" se defiende mejor como decisión fija.
 - **Unit tests con las variables fijadas.** Si alguien cambia `min_duels` en el proyecto, el
@@ -1146,6 +1301,14 @@ el 03 para recrear los clones y los permisos.
 | `generate_schema_name` del curso (schema limpio con target `dev` o `pro`, prefijo en el IDE) | Mantener la del día 4 (nunca prefijo) | Separa el desarrollo en el IDE del despliegue en los jobs; conserva la separación DEV/PRO por base de datos. Sin `pre`; con la rama de CI aunque no haya jobs de CI |
 | Sin `on-run-end` ni hooks de modelo | `log_run_summary`; `pre_hook` y `post_hook` | dbt ya imprime PASS/WARN/ERROR; ningún modelo depende de un parámetro de sesión |
 | Tags por capa y dominio, y selector solo para el job diario sin snapshots | Selectors para cada capa; no usar selectors | Los tags cubren la selección de los jobs; el selector se justifica solo donde un tag no basta |
+| Duelos de compañeros dentro de `int_f1__driver_season_c1` (un solo modelo) | Dos modelos con duelos `ephemeral` (decisión del 21 de noviembre); duelos como modelo propio | Solo se usa en un sitio; el SQL compilado es el mismo; quita un nodo del linaje y el `int` que lee de otro `int`. Si otro criterio necesita los duelos, se vuelve a separar |
+| Entornos DEV y PRO, sin PRE ni freshness ni cron; PRO por job y merge a `main` | Tres entornos; paso de freshness; ejecutar en PRO desde el IDE | Proyecto en solitario con Bronze estático; trazabilidad, credenciales de servicio y revisión |
+| Un solo `dbt build` por job, con el snapshot dentro | Selector aparte y job de snapshot | `build` ya incluye el snapshot y el DAG ordena seed → snapshot |
+| Grants declarativos con `+grants` a `REPORTING_ROLE` en `core` | `run-operation` `grant_select_on_gold` | Se aplican solos en cada build; los grants de `all tables` se pierden al recrear la tabla |
+| Un grupo `analitica_f1`, `int` private y `core` public | Sin grupos; un grupo por modelo | Un solo equipo; deja escrita la intención de qué se consume |
+| Exposure de tipo `analysis` | Exposure `dashboard`; sin exposure | No hay Power BI; el linaje no debe mostrar un dashboard que no existe |
+| Contrato solo en `fct_driver_season` | Contrato en todos los modelos de `core`; sin contratos | Es el mart que consume el ranking; el resto no compensa por trabajo y riesgo |
+| Sin versiones de modelo | `latest_version` con `deprecation_date` | Sin consumidores que migren; un solo propietario |
 
 
 ## Errores y soluciones (rellenar según aparezcan)

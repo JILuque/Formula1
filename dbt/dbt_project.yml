@@ -56,14 +56,20 @@ models:
     gold:
       +tags: ['gold']
       +database: "{{ env_var('DBT_GOLD_DB') }}"
+      +group: analitica_f1 
       intermediate:
         +tags: ['intermediate']
         +materialized: view
         +schema: intermediate
+        +access: private
+
       core:
         +tags: ['core']
         +materialized: table
         +schema: core
+        +access: public
+        +grants:
+          select: ['REPORTING_ROLE']
         +meta:
           owner: "equipo-analitica-f1"
 

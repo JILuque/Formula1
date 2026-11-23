@@ -1,0 +1,11 @@
+exposures:
+  - name: ranking_mejor_piloto
+    type: analysis
+    maturity: medium
+    description: "Ranking de los mejores pilotos 2000-2024 con el score ajustado por coche (consulta en analyses/ranking.sql)."
+    depends_on:
+      - ref('fct_driver_season')
+      - ref('dim_driver')
+    owner:
+      name: Equipo de Analítica F1
+      email: tu-correo@ejemplo.com
