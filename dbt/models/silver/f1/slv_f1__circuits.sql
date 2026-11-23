@@ -1,7 +1,8 @@
 {{ config(
     materialized='incremental',
     incremental_strategy='merge',
-    unique_key='id_circuit'
+    unique_key='id_circuit',
+    on_schema_change='fail'
 ) }}
 
 with calendar as (

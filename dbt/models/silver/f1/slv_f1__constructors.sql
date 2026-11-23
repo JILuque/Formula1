@@ -1,7 +1,8 @@
 {{ config(
     materialized='incremental',
     incremental_strategy='merge',
-    unique_key='id_constructor'
+    unique_key='id_constructor',
+    on_schema_change='fail'
 ) }}
 
 with results as (
