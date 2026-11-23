@@ -1,10 +1,10 @@
 # Bitácora del proyecto final: mejor piloto de F1 2000-2024
-
+ 
 Cuaderno de trabajo. Se añade una entrada por sesión, la más reciente arriba.
 Fecha de entrega: 25 de noviembre de 2026.
-
+ 
 ## Plantilla de entrada
-
+ 
 ```
 ### AAAA-MM-DD: título corto
 **Qué hice:**
@@ -12,11 +12,51 @@ Fecha de entrega: 25 de noviembre de 2026.
 **Problemas encontrados y cómo los resolví:**
 **Pendiente / siguiente paso:**
 ```
-
+ 
 ---
-
+ 
 ## Entradas
-
+ 
+### 2026-11-23: duelos de compañeros dentro de C1 (un solo modelo)
+**Qué hice:**
+- **Uní `int_f1__teammate_duels` en `int_f1__driver_season_c1`.** Los duelos pasan a ser dos
+  CTE de C1 (`sessions` y `duels`) y el modelo agrega al final. Borré el fichero
+  `int_f1__teammate_duels.sql` y su bloque de `_intermediate__models.yml`; la descripción de
+  C1 ahora explica cómo se calculan los duelos. No hay nada que borrar en Snowflake, porque el
+  modelo era `ephemeral` y no creaba ningún objeto.
+- **Comprobación:** [Confirmar: `dbt parse` sin errores, `sum(n_duels)` igual antes y después
+  del cambio, `dbt build --select int_f1__driver_season_c1+` en verde (con
+  `assert_numero_duelos_C1` y los dos unit tests) y ranking sin cambios (Alonso 0,85,
+  Max Verstappen 0,82, Hamilton 0,53, Vettel 0,50).]
+**Por qué lo hice así (y qué alternativa descarté):**
+- **Un solo modelo en lugar de dos.** Comenté con otra profesora el diseño de los dos `int`
+  consecutivos. Ya había dejado el de duelos como `ephemeral` por la primera sugerencia del
+  profesorado (un `int` que lee de otro `int` es poco limpio). Ella lo ve bien, pero opina
+  que, si solo se necesita en un sitio, es mejor un solo `int`. Los duelos solo los lee C1.
+- **Es el mismo SQL.** Un modelo `ephemeral` se inyecta como CTE en el modelo que lo usa, así
+  que unirlos compila a la misma consulta y los datos no cambian. Tampoco se pierde
+  testabilidad: un `ephemeral` ya no se podía testear por separado.
+- **La razón del 21 de noviembre ya no se sostiene.** Entonces descarté unirlos porque
+  "mezcla dos responsabilidades" y porque la tabla de duelos podría servir a otros análisis.
+  Hoy ningún otro modelo la usa; los duelos son un paso interno de C1, y la responsabilidad del
+  modelo es "C1 por piloto y temporada". Si algún día otro criterio necesita los duelos, se
+  vuelve a separar (esta decisión sustituye a la anterior, que sigue en la bitácora con su fecha).
+- **`duels` solo conserva `season_year`, `id_driver` y `win_duel`.** Son las únicas columnas
+  que C1 usa después; `id_race`, `session_type`, `id_constructor` e `id_rival` solo hacían
+  falta para el emparejamiento.
+- **Lo que no toqué:** `gold_results__enriched`, que alimenta a `fct_driver_race`, es un `int`
+  que lo lee un modelo de `core`, no dos `int` seguidos.
+**Cosas que aprendí:** un modelo `ephemeral` es una forma de separar el código sin crear un
+objeto, pero si solo lo lee otro modelo, separarlo en dos ficheros añade un nodo al linaje sin
+ganar nada.
+ 
+**Problemas encontrados y cómo los resolví:** ninguno.
+ 
+**Pendiente / siguiente paso:** confirmar la comprobación de arriba; después, día 8 (groups y
+access, grants para `REPORTING_ROLE`, exposure y contrato en `fct_driver_season`).
+ 
+---
+ 
 ### 2026-11-23: día 6 (variables, generate_schema_name del curso, tags y selectors)
 **Qué hice:**
 - **Variables del score en `dbt_project.yml`:** `min_valid_races: 8`, `min_duels: 10` y
@@ -28,15 +68,15 @@ Fecha de entrega: 25 de noviembre de 2026.
   `dev` o `pro` (y fuera de CI) usa el schema tal cual (`CORE`); en el resto, el IDE incluido,
   usa `target.schema` + `_` + el schema (`DBT_ILUQUE_CORE`). El primer `dbt build` creó
   `DBT_ILUQUE_F1`, `_SEEDS`, `_SNAPSHOTS`, `_CORE` e `_INTERMEDIATE`; el build completo dio
-  verde y el ranking quedó igual. Los schemas antiguos `F1`, `SEEDS`, `SNAPSHOTS`,
-  `CORE` e `INTERMEDIATE` se borran.]
+  verde y el ranking quedó igual. [Confirmar: schemas antiguos `F1`, `SEEDS`, `SNAPSHOTS`,
+  `CORE` e `INTERMEDIATE` borrados.]
 - **Tags por capa** en `dbt_project.yml` (`staging`, `silver`, `gold`, `intermediate` y
-  `core`). Tags creados y resultado de `dbt ls --select tag:silver` (7 modelos) y
-  `tag:core` (5).
-- **`selectors.yml`**. 
+  `core`). [Confirmar: tags creados y resultado de `dbt ls --select tag:silver` (7 modelos) y
+  `tag:core` (5).]
+- **`selectors.yml`**. [Confirmar: qué selectores quedaron (previsto `diario_sin_snapshots`)
+  y que `dbt ls --selector ...` devuelve lo esperado.]
 - **No implementado:** el hook `on-run-end` con `log_run_summary`, los hooks de modelo, los
   secretos `DBT_ENV_SECRET_` y subir la config común de Silver a `dbt_project.yml`.
-
 **Por qué lo hice así (y qué alternativa descarté):**
 - **Umbrales como `var()` y bases de datos como `env_var()`.** Los umbrales son una decisión
   metodológica del proyecto y valen igual en todos los entornos, así que van en `vars`. Lo que
@@ -74,7 +114,6 @@ Fecha de entrega: 25 de noviembre de 2026.
   --exclude resource_type:snapshot` también habría bastado.
 - **Qué no moví:** la config común de Silver (`materialized` y `on_schema_change`) sigue en
   cada modelo.
-
 **Cosas que aprendí:**
 - En el IDE, `target.name` es `default`, así que la rama de schemas limpios de la macro nunca
   se activa ahí. Para probarla sin jobs hay que cambiar temporalmente la lista de targets y
@@ -86,16 +125,15 @@ Fecha de entrega: 25 de noviembre de 2026.
 - Cambiar la macro cambió la ubicación del snapshot: `DBT_ILUQUE_SNAPSHOTS` empezó con una sola
   versión por estado. La historia de la prueba de `Retired` quedó en el schema antiguo, que era
   una demostración.
-
 **Problemas encontrados y cómo los resolví:** el comentario de cabecera de la macro seguía
 describiendo la versión anterior; lo corregí.
-
+ 
 **Pendiente / siguiente paso:** pull request de DEV a `main`; día 7: entornos `dev` y `pro` y
 jobs, con el target de cada job como `dev` o `pro` (así se comprueba en la práctica la rama
 limpia de la macro) y un job aparte para `dbt snapshot`.
-
+ 
 ---
-
+ 
 ### 2026-11-23: día 5 (on_schema_change y snapshot de la clasificación de estados)
 **Qué hice:**
 - **`on_schema_change='fail'`** en la config de los 7 modelos incrementales de Silver
@@ -114,7 +152,6 @@ limpia de la macro) y un job aparte para `dbt snapshot`.
   Silver con `dbt build --full-refresh --select slv_f1__results+ slv_f1__sprint_results+`.
   [Completar: efecto en el top 10 del ranking al pasar `Retired` a `mechanical`.]
   [Confirmar: seed devuelta a `other_not_finished` y ranking igual que antes de la prueba.]
-
 **Por qué lo hice así (y qué alternativa descarté):**
 - **`on_schema_change='fail'` en lugar del valor por defecto (`ignore`).** Con `ignore`, si
   añado o quito una columna del `select` de un modelo incremental, dbt no toca la tabla y
@@ -161,7 +198,6 @@ limpia de la macro) y un job aparte para `dbt snapshot`.
     `--full-refresh`.
   - El ejercicio de `append` frente a `delete+insert` (modelos temporales sin uso en el
     proyecto).
-
 **Cosas que aprendí:**
 - **Cambiar la seed no cambia Silver.** `status_category` se calcula en Silver, que es
   incremental y solo reprocesa la última temporada, así que las 24 anteriores conservan la
@@ -171,15 +207,14 @@ limpia de la macro) y un job aparte para `dbt snapshot`.
   devuelvo a su valor sin ejecutar `dbt snapshot` entre medias, el cambio intermedio no
   queda registrado. Cada ejecución que detecta una diferencia cierra la versión vigente y abre
   otra; no se borra nada, así que cambiar y revertir deja tres versiones.
-
 **Problemas encontrados y cómo los resolví:** ninguno.
-
+ 
 **Pendiente / siguiente paso:** pull request de DEV a `main`; más adelante, entornos y jobs
 en PRO (con `dbt snapshot` en el job y la historia del snapshot de PRO empezando en su primera
 ejecución). Opcional: `agg_driver_career`, `groups` y `access`, Power BI.
-
+ 
 ---
-
+ 
 ### 2026-11-23: día 4 (generate_schema_name, owner y macro z_score)
 **Qué hice:** apliqué del día 4 lo que tiene sentido en este proyecto.
 - **Macro `generate_schema_name`** (`macros/generate_schema_name.sql`), con la versión del curso:
@@ -197,7 +232,6 @@ ejecución). Opcional: `agg_driver_career`, `groups` y `access`, Power BI.
   `{{ z_score('c3_positions_vs_car') }}`. Comprobé que el SQL compilado es el mismo (salvo
   espacios), que los dos unit tests pasan y que el ranking no cambia (Alonso 0,85, Max
   Verstappen 0,82, Hamilton 0,53 y Vettel 0,50).
-
 **Por qué lo hice así (y qué alternativa descarté):**
 - **`generate_schema_name` sin prefijo.** El comportamiento por defecto de dbt (`schema de la
   conexión` + `_` + `schema del modelo`) protege a un equipo que comparte una base de datos de
@@ -232,18 +266,16 @@ ejecución). Opcional: `agg_driver_career`, `groups` y `access`, Power BI.
 - **Gobierno del dato en el proyecto**, con los tres pilares de la diapositiva: calidad (data
   tests, tests singulares y unit tests), linaje (el DAG de dbt, de Bronze a `core`) y catálogo
   (descripciones, docs blocks y `meta.owner` en la documentación generada).
-
 **Problemas encontrados y cómo los resolví:**
 - Las entradas anteriores decían que las vistas de staging estaban en el schema `f1`. Era
   inexacto: dbt las creaba en `DBT_ILUQUE_F1`. Lo detecté con `show schemas` antes de aplicar
   la macro y lo dejo anotado aquí; las entradas antiguas no se reescriben.
-
 **Pendiente / siguiente paso:** pull request de DEV a `main`; más adelante, entornos y jobs
 (PRO). Opcional: macro para el filtro de temporadas de Silver, `agg_driver_career`, `groups` y
 `access`, Power BI.
-
+ 
 ---
-
+ 
 ### 2026-11-22: contraste entre el ranking en bruto y el ajustado
 **Qué hice:** creé `analyses/ranking_bruto_vs_ajustado.sql`, que compara, para los mismos
 pilotos que `ranking.sql` (score en temporadas fiables y mínimo de 100 carreras: 33 pilotos), el
@@ -251,7 +283,7 @@ puesto según las victorias y el puesto según el score. Lee solo de `dim_driver
 `fct_driver_season`; no hay modelos nuevos. Devuelve victorias, podios, porcentaje de
 victorias, score, `puesto_bruto`, `puesto_ajustado` y `diferencia` (puesto bruto menos puesto
 ajustado: positivo si el ajuste lo sube).
-
+ 
 **Por qué lo hice así (y qué alternativa descarté):**
 - **Es el contrapunto del caso de uso.** La pregunta es quién es el mejor piloto
   independientemente del coche; para justificar el método hay que enseñar qué saldría sin él.
@@ -261,7 +293,6 @@ ajustado: positivo si el ajuste lo sube).
 - **Mismos pilotos en los dos rankings**, para que la diferencia de puestos tenga sentido. Las
   victorias y carreras de `dim_driver` cuentan todas las temporadas, también las no fiables:
   es lo que vería cualquiera sin el método.
-
 **Resultado (33 pilotos):** la correlación entre los dos órdenes es de 0,58: el coche explica
 una parte importante del ranking en bruto, pero no todo. Solo 6 de los 10 primeros del ranking
 ajustado están entre los 10 primeros en bruto, y 11 pilotos se mueven 10 puestos o más.
@@ -272,7 +303,6 @@ ajustado están entre los 10 primeros en bruto, y 11 pilotos se mueven 10 puesto
 - **Bajan los de coche de equipo grande, casi todos con un campeón de compañero:** Massa (-17),
   Coulthard (-13), Ralf Schumacher (-13), Barrichello (-12), Michael Schumacher (-10) y Pérez
   (-9).
-
 **Limitaciones a tener presentes en la defensa:**
 - **Los puestos bajos del bruto son poco informativos:** muchos pilotos tienen 0 victorias y se
   desempatan por podios, así que parte del salto de Hülkenberg o Heidfeld es el orden del
@@ -284,12 +314,11 @@ ajustado están entre los 10 primeros en bruto, y 11 pilotos se mueven 10 puesto
   13.º por la ventana 2000-2024 y el techo del coche.
 - El score mide rendimiento relativo a su coche y su compañero, no el mejor piloto de la
   historia.
-
 **Pendiente / siguiente paso:** decidir cómo presentarlo en la defensa (qué tabla enseñar y
 cuántos pilotos) y, si da tiempo, `agg_driver_career` para tener el ranking como tabla.
-
+ 
 ---
-
+ 
 ### 2026-11-22: día 3 (dbt_utils, tests, unit tests y docs blocks)
 **Qué hice:** seguí las diapositivas del día 3 sobre el proyecto.
 - **Paquete `dbt_utils`.** Creé `packages.yml` (`dbt-labs/dbt_utils`, versión `>=1.3.0,<2.0.0`),
@@ -317,7 +346,6 @@ cuántos pilotos) y, si da tiempo, `agg_driver_career` para tener el ranking com
   `dbt docs generate` pasan tras este cambio.
 - Unifiqué los nombres de los `.yml`: `_staging_f1__models.yml`, `_silver_f1__models.yml`,
   `_intermediate__models.yml` y `_core__models.yml`.
-
 **Por qué lo hice así (y qué alternativa descarté):**
 - **`generate_surrogate_key` en lugar de `md5` a mano.** Es la función del paquete que vimos
   en clase: hace el hash, pone un separador entre columnas y trata los nulos, y se escribe
@@ -373,7 +401,6 @@ cuántos pilotos) y, si da tiempo, `agg_driver_career` para tener el ranking com
   ficheros para el beneficio.
 - **Los `.yml` con tests siguen siendo uno por carpeta**, con nombre `_<capa>_f1__models.yml`
   en staging y Silver, y `_<carpeta>__models.yml` en Gold, que no tiene un origen único.
-
 **Problemas encontrados y cómo los resolví:**
 - Las descripciones aparecían unas con comillas y otras sin ellas tras regenerar los `.yml`.
   Decidí poner todas entre comillas dobles y lo regeneré con ese formato.
@@ -381,14 +408,13 @@ cuántos pilotos) y, si da tiempo, `agg_driver_career` para tener el ranking com
   sustituta de".
 - Una primera justificación del test de tiempos ("no uso los tiempos") era incorrecta: C1 los
   necesita. La reescribí con el argumento del impacto.
-
 **Pendiente / siguiente paso:** pull request de DEV a `main`, despliegue y job en PRO;
 contraste entre el ranking en bruto y el ajustado por coche; modelos físicos de cada capa
 (para la defensa); y subir `04_demo_incremental.sql` y los CSV de prueba a `/ingesta`.
 Opcional: `agg_driver_career` y Power BI.
-
+ 
 ---
-
+ 
 ### 2026-11-22: dimensiones, gold_results__enriched y fct_driver_race
 **Qué hice:** completé el modelo dimensional de Gold. En `models/gold/core/` creé las
 tres dimensiones (`dim_driver`, `dim_constructor`, `dim_race`) y la segunda tabla de
@@ -440,7 +466,6 @@ documentada existe en el SQL de su modelo (comprobado).
   clasificaciones que faltan en 2000-2002, sprint solo en 18 carreras): es lo que
   preguntaría quien consulte la tabla sin conocer los datos. Sin tests por ahora: se añaden
   juntos en el día 3. El modelo `ephemeral` de duelos se documenta, pero no admite tests.
-
 **Problemas encontrados y cómo los resolví:**
 - El linaje de dbt mostraba sueltas las tablas de Silver de circuitos, carreras, pilotos y
   constructores: hasta crear las dimensiones no las leía ningún modelo. Tras `dbt compile`
@@ -449,7 +474,6 @@ documentada existe en el SQL de su modelo (comprobado).
 `relationships` entre los hechos y las tres dimensiones, `not_null` en `status_category`, 
 cobertura 2000-2024, tiempos perdidos de clasificación).
  
-
 ### 2026-11-22: fct_driver_season y ranking
 **Qué hice:** creé `fct_driver_season` en `models/gold/core/` (tabla, una fila por
 piloto y temporada) y la consulta `analyses/ranking.sql`. La tabla reúne C1, C2 y
@@ -461,7 +485,7 @@ El ranking agrega esas temporadas por piloto con una media ponderada por
 carreras y exige un mínimo de 100 carreras. Resultado (top 10): Alonso 0,85,
 Max Verstappen 0,82, Hamilton 0,53, Vettel 0,50, Gasly 0,47, Russell 0,46,
 Norris 0,41, Rosberg 0,39, Button 0,34 y Ricciardo 0,32.
-
+ 
 **Por qué lo hice así (y qué alternativa descarté):**
 - **z-score dentro de cada temporada.** C1 es un porcentaje, C2 una tasa
   pequeña y C3 son posiciones: no se pueden sumar tal cual, y C3 se comería a las
@@ -496,7 +520,6 @@ Norris 0,41, Rosberg 0,39, Button 0,34 y Ricciardo 0,32.
   (compañeros flojos y un coche de la cola donde unas pocas buenas carreras
   suman mucho). Con 100 desaparece. El mínimo de 36 se conserva como análisis
   de sensibilidad.
-
 **Problemas encontrados y cómo los resolví:**
 - **Primera versión de C3 con sesgo.** El puesto esperado era `2 * puesto - 0,5`.
   Con esa fórmula, los pilotos de equipos de la cola salían inflados (casi todo
@@ -517,7 +540,6 @@ Norris 0,41, Rosberg 0,39, Button 0,34 y Ricciardo 0,32.
   orden inventado. `dense_rank()` lo descarté porque junta niveles de coche
   distintos. Antes de este cambio, mi comprobación de empates solo había mirado
   los de más de 0 puntos.
-
 **Limitaciones conocidas (para la defensa):**
 - **C1 no pondera la calidad del compañero.** Ganar un duelo a un compañero
   flojo vale lo mismo que ganárselo a un campeón. Ejemplo: Norris en 2021 y 2022
@@ -534,16 +556,15 @@ Norris 0,41, Rosberg 0,39, Button 0,34 y Ricciardo 0,32.
   cualquier tratamiento de los empates; a partir del tercero el orden depende
   de las decisiones de diseño. Gasly sube por tres temporadas con AlphaTauri
   (2020-2022) con C3 entre +1,6 y +2,7.
-
 **Pendiente / siguiente paso:** tests (día 3) de Silver y Gold; dimensiones
 (`dim_driver`, `dim_constructor`...) y la tabla de hechos piloto-carrera
 (`fct_driver_race`), con un `gold_results__enriched` como modelo ancho previo;
 contraste entre el ranking en bruto y el ajustado por coche; modelos físicos
 de cada capa; pull request de DEV a main y despliegue en PRO. Opcional:
 `agg_driver_career`, Power BI.
-
+ 
 ---
-
+ 
 ### 2026-11-21: Gold intermedio (duelos, C1, C2 y C3)
 **Qué hice:** creé la capa Gold intermedia en `models/gold/intermediate/` con
 cuatro modelos y añadí el bloque `gold` a `dbt_project.yml` (base de datos
@@ -557,7 +578,6 @@ Cifras contrastadas con los CSV: 16.978 filas de duelos (8.489 duelos, cada uno
 con una fila desde cada piloto: 3.896 de carrera, 4.417 de clasificación y 176
 de sprint); C1 con 597 filas; C2 con 598 filas (10.071 carreras y 865 incidentes);
 C3 con 594 filas (8.773 carreras válidas).
-
 **Por qué lo hice así (y qué alternativa descarté):**
 - **Duelos con un `join` del modelo consigo mismo.** Para cada sesión, se une
   cada piloto con los demás del mismo equipo en la misma carrera (`a.id_driver <>
@@ -601,7 +621,6 @@ C3 con 594 filas (8.773 carreras válidas).
 - **Puesto esperado y desempates**: véase la entrada del 2026-11-22.
 - **Opción A en C3:** se excluyen las carreras con estado `mechanical` o
   `not_started`; se mantienen `driver_incident` y `other_not_finished`.
-
 **Problemas encontrados y cómo los resolví:**
 - Al lanzar la consulta de comprobación con `ref()` en Snowsight dio error de sintaxis:
   `ref()` solo se renderiza en dbt. Se ejecuta con Preview en el IDE o desde
@@ -611,7 +630,6 @@ C3 con 594 filas (8.773 carreras válidas).
   del modelo antes de consultarlo.
 - Dudaba de que 1.141 duelos anulados fuera correcto: eran 1.136 por avería y 5
   por no salir, sin doble recuento.
-
 **Cosas que aprendí de los datos:**
 - Hay 80 pilotos-temporada con menos de 10 duelos (C1) y 47 con menos de 5
   carreras (C2): son muestras pequeñas, que se tratan en el `fct` con el
@@ -620,11 +638,10 @@ C3 con 594 filas (8.773 carreras válidas).
   que están en C1 y C2 pero no en C3 (todas sus carreras fueron por avería).
 - Entre 2000 y 2002 la clasificación está incompleta (44 fines de semana sin
   ella), así que C1 usa solo carrera en esos años.
-
 **Pendiente / siguiente paso:** `fct_driver_season` y el ranking.
-
+ 
 ---
-
+ 
 ### 2026-11-20: demostración de la incrementalidad con tasks de Snowflake y macros
 **Qué hice:** para enseñar en la defensa que Silver es incremental y no duplica,
 preparé dos CSV de prueba (`calendario_test.csv`, con una carrera de 2025, ronda
@@ -642,7 +659,6 @@ Flujo de la demo: `dbt run-operation insertar_incremental`, `dbt run --select
 silver`, `dbt run-operation ver_2025` y, al terminar, `dbt run-operation
 limpiar_incremental`. La incrementalidad funciona: se añaden las filas de 2025
 sin duplicar nada.
-
 **Por qué lo hice así (y qué alternativa descarté):**
 - **CSV de prueba y no una macro que inserte una fila a mano:** simula una carga
   real (fichero, `COPY INTO`, dbt) y no toca el código de los modelos.
@@ -657,7 +673,6 @@ sin duplicar nada.
   las filas en Bronze.
 - **Código lo más simple posible:** simplifiqué una primera versión que esperaba a
   la task con un bucle, porque no se entendía; ahora espera 10 segundos y cuenta.
-
 **Problemas encontrados y cómo los resolví:**
 - La task falló por permisos: se ejecuta con los privilegios del propietario
   (SYSADMIN) y el stage era de ACCOUNTADMIN. Se resolvió dando lectura y escritura
@@ -671,11 +686,10 @@ sin duplicar nada.
 - Los registros de prueba **siguen en Silver tras limpiar Bronze**, porque el
   `merge` no borra: para eliminarlos hay que ejecutar `dbt run --select silver
   --full-refresh`.
-
 **Pendiente / siguiente paso:** ninguno propio; la demo queda lista para la defensa.
-
+ 
 ---
-
+ 
 ### 2026-11-20: Silver (7 modelos incrementales)
 **Qué hice:** creé la capa Silver en `models/silver/f1/` con 7 modelos
 incrementales (`merge`): 4 entidades (`slv_f1__circuits`, `slv_f1__races`,
@@ -772,7 +786,6 @@ duplicados.
 **Problemas encontrados y cómo los resolví:**
 - Mi primera idea para `drivers` y `constructors` (unir resultados y
   clasificación) era innecesaria; la simplifiqué tras comprobar los datos.
-
 **Pendiente / siguiente paso:** tests (día 3): `unique` y `not_null` en los `id_*`,
 `relationships` entre hechos y entidades, `not_null` en `status_category`,
 cobertura 2000-2024 y el test de tiempos perdidos de `qualifying`. Después, Gold:
@@ -810,7 +823,7 @@ día 3.]
 previa, así que no hay que escribirlo.
  
 **Pendiente / siguiente paso:** Silver.
-
+ 
 ### 2026-11-19: cambio del origen a 3 ficheros planos
 **Qué hice:** sustituí los 8 CSV originales por tres ficheros planos
 (`calendario`, `resultados`, `clasificacion`) con todos los años (1950-2024).
@@ -820,11 +833,11 @@ sources (3 tablas, todas las columnas documentadas) y ajusté el seed.
 Recuentos en Bronze: calendario 1125, resultados 26759, clasificacion 10494
 (iguales en DEV y PRO). `dbt parse`, `dbt seed`, `dbt test` (6 tests) y
 `dbt build` pasan.
-
+ 
 **Origen de los datos:** los ficheros son datos de F1 publicados en Kaggle,
 derivados del dataset *Formula 1 World Championship (1950-2020)* de Rohan Rao.
-
-
+ 
+ 
 **Por qué lo hice así (y qué alternativas descarté):**
 - **Ficheros planos desnormalizados** en lugar de las 8 tablas relacionales:
   el profesorado pidió datos desnormalizados y que el linaje no sea lineal. Con
@@ -844,7 +857,6 @@ derivados del dataset *Formula 1 World Championship (1950-2020)* de Rohan Rao.
   el seed. Se añadió `not_null` al texto, que ahora es la clave de unión.
 - **Script 03 solo con PRO:** sin entorno PRE. Las databases PRE existen pero no
   se usan.
-
 **Cosas que aprendí de los datos:**
 - Los sprint vienen dentro de `clasificacion`, al final de cada fila de
   clasificación. Los 360 sprint originales están todos, así que no se perdió
@@ -854,12 +866,11 @@ derivados del dataset *Formula 1 World Championship (1950-2020)* de Rohan Rao.
   que el test de unicidad debe aplicarse después del filtro del periodo.
 - Los nulos vienen marcados como `\N`; el formato de fichero de Snowflake los
   convierte a NULL.
-
 **Problemas encontrados:** ninguno.
-
+ 
 **Pendiente / siguiente paso:** modelos de staging (`stg_f1__*`) y su
 configuración en `dbt_project.yml`; después, Silver.
-
+ 
 ### 2026-11-17: sources de Bronze y ajuste del tipo del seed
 **Qué hice:** creé `models/staging/f1/_f1__sources.yml` con las 8 tablas de
 `DEV_BRONZE_DB.f1` (circuits, constructors, drivers, races, status, qualifying,
@@ -868,7 +879,7 @@ con su descripción. La database se resuelve con `env_var('DBT_BRONZE_DB')`.
 Ajusté el seed `status_classification` para que `status_id` sea `integer` y
 lo recreé con `dbt seed --full-refresh`. [`dbt parse` OK / preview de
 `source('f1', 'status')` devuelve filas].
-
+ 
 **Por qué lo hice así (y qué alternativas descarté):**
 - **Sin freshness.** Bronze se cargó una vez, a mano, desde un dataset
   histórico y estático; el umbral de 24/48 h de la guía fallaría siempre.
@@ -886,7 +897,6 @@ lo recreé con `dbt seed --full-refresh`. [`dbt parse` OK / preview de
   `varchar` tal como llegan y staging los convierte al tipo real.
 - **Tests de sources aplazados** hasta el tema de tests del curso. Mi
   inclinación es ponerlos en staging.
-
 **Cosas que aprendí de los datos:**
 - `drivers.number` es el número permanente elegido por el piloto (sistema
   desde 2014); solo 59 de los 861 pilotos lo tienen. No es el dorsal de cada
@@ -898,37 +908,35 @@ lo recreé con `dbt seed --full-refresh`. [`dbt parse` OK / preview de
   Brasil 1983). `positionText` indica si la posición es real (número) o
   administrativa (letra).
 - `grid = 0` cuando no hay posición de parrilla.
-
 **Problemas encontrados:** ninguno.
-
+ 
 **Pendiente / siguiente paso:** Siguiente tema de la guía (staging, Día 2).
-
+ 
 ### 2026-11-16: configuración del seed y entorno de dbt
 **Qué hice:** creé `seeds/status_classification.csv` (139 filas) y `seeds/_seed.yml`
 con descripciones y 5 tests. Configuré el seed en `dbt_project.yml` (destino en
 Silver mediante `DBT_SILVER_DB`, schema `seeds` y tipos fijados con
 `+column_types`). Renombré el proyecto a `f1`. `dbt parse`, `dbt seed` y
 `dbt test` pasaron. Recuento en Snowflake: [139].
-
+ 
 **Decisiones de entorno:**
 - Dos entornos (DEV y PRO), sin PRE: proyecto en solitario, sin otro equipo
   que valide. Las databases PRE existen en Snowflake por la plantilla, pero no
   se usan.
 - Trabajo en la rama `DEV` con pull request a `main`.
 - Versión de dbt: v1 (latest). En producción usaré la misma.
-
 **Problemas encontrados:** ninguno.
-
+ 
 **Siguiente paso:** declarar las sources de Bronze (`DEV_BRONZE_DB.f1`) con
 freshness sobre `_loaded_at`, y después los modelos `stg_*`.
-
+ 
 ### 2026-11-15: seed de clasificación de estados (status_classification)
 **Qué hice:** revisé la guía del Día 1 (seeds y sources) y decidí qué aplicar a
 mi proyecto. Definí la clasificación de los 139 estados de `status` en cinco
 categorías y generé el CSV `status_classification.csv`, que será un seed en
 Silver. Dentro de `/dbt` (subdirectorio configurado en dbt Platform), el seed irá
 en `seeds/`. [Pendiente: configurarlo y ejecutar `dbt seed`.]
-
+ 
 **Por qué un seed (y qué alternativas descarté):**
 - La clasificación no existe en origen: `status` solo trae `statusId` y el texto.
   Es una regla de negocio mía, así que no va a Bronze, que debe conservar el
@@ -938,7 +946,6 @@ en `seeds/`. [Pendiente: configurarlo y ejecutar `dbt seed`.]
   del curso recomienda los seeds para listas cortas y estables que no existen
   en origen, como un mapeo de categorías.
 - `status` se queda intacta en Bronze, y el seed se une a ella por `status_id`.
-
 **Categorías y criterios:**
 - `finished` (34): terminó, incluidas las vueltas de retraso.
 - `mechanical` (81): fallo del coche o causa ajena al piloto. Incluye neumáticos
@@ -951,7 +958,6 @@ en `seeds/`. [Pendiente: configurarlo y ejecutar `dbt seed`.]
   `Stalled`, lesiones, enfermedad y exclusiones.
 - `not_started` (3): solo quien nunca estuvo en parrilla (`Did not qualify`,
   `Did not prequalify`, `107% Rule`).
-
 **Decisiones concretas y su porqué:**
 - `Retired` (76 filas, 0,75 % de 10.079 en 2000-2024) va a `other_not_finished`.
   El estado no indica causa. Revisé una muestra de 6: 5 fueron fallos del coche
@@ -973,14 +979,13 @@ en `seeds/`. [Pendiente: configurarlo y ejecutar `dbt seed`.]
   clasificada o no. Motivo: se explica en una frase y no depende del umbral del
   90 %. La opción B (excluir solo las no clasificadas) queda como análisis de
   sensibilidad.
-
 **Problemas encontrados y cómo los resolví:** ninguno.
-
+ 
 **Pendiente / siguiente paso:** configurar el seed en `dbt_project.yml` (destino en
 Silver, `status_id` como `varchar` con `+column_types`), crear `seeds/_seeds.yml`
 con descripciones y tests (`unique` en `status_id`, `accepted_values` en la
 categoría), ejecutar `dbt seed` y comprobar que hay 139 filas.
-
+ 
 ### 2026-11-11: conexión de Snowflake con dbt Platform mediante clave RSA
 **Qué hice:** añadí un script de Python (Snowpark) que genera un par de claves
 RSA de 2048 bits: la clave privada cifrada en formato PKCS#8 con una passphrase
@@ -988,17 +993,16 @@ aleatoria, y la sentencia `alter user ... set rsa_public_key` con la clave
 pública. Ejecuté el `alter user` con SECURITYADMIN y configuré la conexión en dbt
 Platform con mi usuario, la clave privada y la passphrase, usando el rol
 DEV_TRANSFORM_ROLE, el warehouse WH_PROYECTO y DEV_SILVER_DB.
-
+ 
 **Por qué lo hice así (y qué alternativa descarté):**
 - Autenticación por clave en lugar de usuario y contraseña: no se guarda ninguna
   contraseña en la configuración de dbt y porque mi cuenta exige MFA.
-
 **Problemas encontrados y cómo los resolví:** ninguno.
-
+ 
 **Pendiente / siguiente paso:** borrar la salida del worksheet con la clave y la
 passphrase, comprobar la conexión con `dbt debug` o el botón de test, y crear
 las sources y los modelos stg_*.
-
+ 
 ### 2026-11-09: entorno Snowflake y carga de bronze (scripts 01, 02 y 03)
 **Qué hice:** ejecuté los tres scripts de la plantilla del curso, adaptados al
 proyecto:
@@ -1010,7 +1014,6 @@ proyecto:
   de lectura sobre bronze para cada rol de su entorno.
 Comprobé los recuentos (results 26759, etc.) y que DEV_TRANSFORM_ROLE puede leer
 bronze.
-
 **Por qué lo hice así (y qué alternativa descarté):**
 - Sigo la plantilla del curso y solo cambio lo propio de mi fuente.
 - Schema f1 en lugar de kaggle_f1: nos dijeron que el schema no suele llevar el
@@ -1028,20 +1031,19 @@ bronze.
 - Los CSV también se guardan en el repo (carpeta de datos) solo para que el
   proyecto sea reproducible; no se carga desde GitHub porque COPY INTO lee de
   stages, no de repositorios.
-
 **Problemas encontrados y cómo los resolví:** ninguno.
-
+ 
 **Pendiente / siguiente paso:** crear el proyecto dbt (profiles.yml, sources
 apuntando a DEV_BRONZE_DB.f1 y los 8 modelos stg_*). Aviso para el futuro: si
 recargo bronze con el script 02 (usa create or replace table), hay que repetir
 el 03 para recrear los clones y los permisos.
-
+ 
 ### 2026-11-06: criterio de mínimo de carreras y script de carga bronze
 **Qué hice:** fijé un mínimo de 36 carreras para entrar en el top del ranking y preparé el script SQL de carga de las 8 tablas en el esquema `RAW`.
 **Por qué lo hice así (y qué alternativa descarté):** el mínimo evita que un piloto con una sola temporada brillante se cuele en el top 5. Elegí 36 (temporada y media) frente a no poner filtro, 5 o 24 carreras. El ranking se calcula completo y se marca con una columna `cumple_minimo_carreras`, en lugar de excluir pilotos del modelo, para poder mostrar el efecto del filtro. En bronze los tiempos se dejan como texto y los nulos `\N` se convierten a `NULL`; los tipos se tratarán en staging.
 **Problemas encontrados y cómo los resolví:** tres pesos de 0,33 suman 0,99; usaré 1/3 exacto para que el test de pesos pase.
 **Pendiente / siguiente paso:** cargar los datos y verificar recuentos (circuits 77, constructors 212, drivers 861, races 1125, status 139, qualifying 10494, results 26759, sprint_results 360).
-
+ 
 ### 2026-11-05: definición del caso de uso, método y arquitectura
 **Qué hice:** definí el caso de uso (¿quién es el mejor piloto 2000-2024, independientemente del coche?) y diseñé el método, la arquitectura Medallion y el plan de trabajo.
 **Por qué lo hice así (y qué alternativa descarté):**
@@ -1053,11 +1055,10 @@ el 03 para recrear los clones y los permisos.
 - Solo cargo 8 CSV; el resto de información (clasificaciones) se deriva con dbt.
 **Problemas encontrados y cómo los resolví:** ninguno.
 **Pendiente / siguiente paso:** carga bronze y configuración del proyecto dbt.
-
 ---
-
+ 
 ## Registro de decisiones (resumen vivo)
-
+ 
 | Decisión | Alternativa descartada | Justificación |
 | --- | --- | --- |
 | Un caso de uso grande con contrapunto | Dos casos medianos | Profundidad en un solo problema |
@@ -1146,9 +1147,10 @@ el 03 para recrear los clones y los permisos.
 | `generate_schema_name` del curso (schema limpio con target `dev` o `pro`, prefijo en el IDE) | Mantener la del día 4 (nunca prefijo) | Separa el desarrollo en el IDE del despliegue en los jobs; conserva la separación DEV/PRO por base de datos. Sin `pre`; con la rama de CI aunque no haya jobs de CI |
 | Sin `on-run-end` ni hooks de modelo | `log_run_summary`; `pre_hook` y `post_hook` | dbt ya imprime PASS/WARN/ERROR; ningún modelo depende de un parámetro de sesión |
 | Tags por capa y dominio, y selector solo para el job diario sin snapshots | Selectors para cada capa; no usar selectors | Los tags cubren la selección de los jobs; el selector se justifica solo donde un tag no basta |
-
-
+| Duelos de compañeros dentro de `int_f1__driver_season_c1` (un solo modelo) | Dos modelos con duelos `ephemeral` (decisión del 21 de noviembre); duelos como modelo propio | Solo se usa en un sitio; el SQL compilado es el mismo; quita un nodo del linaje y el `int` que lee de otro `int`. Si otro criterio necesita los duelos, se vuelve a separar |
+ 
+ 
 ## Errores y soluciones (rellenar según aparezcan)
-
+ 
 | Fecha | Error | Causa | Solución |
 | --- | --- | --- | --- |
