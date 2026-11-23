@@ -59,6 +59,8 @@ models:
       core:
         +materialized: table
         +schema: core
+        +meta:
+          owner: "equipo-analitica-f1"
 
 
 
