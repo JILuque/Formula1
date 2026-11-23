@@ -16,7 +16,7 @@ with ajustado as (
     from {{ ref('fct_driver_season') }}
     where score is not null
     group by id_driver
-    having sum(n_races) >= 100
+    having sum(n_races) >= {{ var('min_career_races') }}
 ),
 
 ranking as (

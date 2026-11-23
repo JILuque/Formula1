@@ -32,7 +32,7 @@ joined as (
         c1.c1_win_rate,
         c2.c2_incident_rate,
         c3.c3_positions_vs_car,
-        coalesce(c3.n_races_valid >= 8 and c1.n_duels >= 10, false) as is_reliable_sample
+        coalesce(c3.n_races_valid >= {{ var('min_valid_races') }} and c1.n_duels >= {{ var('min_duels') }}, false) as is_reliable_sample
     from c2
     left join c1 on c2.id_driver = c1.id_driver and c2.season_year = c1.season_year
     left join c3 on c2.id_driver = c3.id_driver and c2.season_year = c3.season_year

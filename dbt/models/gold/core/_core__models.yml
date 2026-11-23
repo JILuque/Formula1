@@ -356,6 +356,10 @@ unit_tests:
   - name: test_fct_driver_season_desviacion_cero
     description: "Con un solo piloto fiable en la temporada la desviación es 0: los z-scores y el score quedan nulos y no hay error de división por cero."
     model: fct_driver_season
+    overrides:
+      vars:
+        min_valid_races: 8
+        min_duels: 10
     given:
       - input: ref('int_f1__driver_season_c1')
         rows:

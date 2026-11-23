@@ -89,5 +89,8 @@ snapshots:
     
 ### VARS
 vars:
-  season_start: 2000
-  season_end: 2024
+  season_start: 2000      # Temporada de inicio para el caso de uso
+  season_end: 2024        # Temporada final para el caso de uso
+  min_valid_races: 8      # carreras válidas mínimas para muestra fiable (C3)
+  min_duels: 10           # duelos entre compañeros mínimos (C1)
+  min_career_races: 100   # carreras mínimas en 2000-2024 para entrar al ranking
