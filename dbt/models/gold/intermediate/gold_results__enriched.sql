@@ -1,6 +1,7 @@
 ------------------------------------------------------------
 -- gold_results__enriched: una fila por piloto y carrera, con la clasificación y el sprint del fin de semana unidos a la carrera.
 -- Clasificación y sprint pueden ser nulos: faltan clasificaciones de 2000-2002 y solo hay sprint en 18 carreras.
+-- Incremental (merge): solo reprocesa desde la última temporada ya cargada, igual que Silver.
 ------------------------------------------------------------
 
 {{ config(
@@ -17,6 +18,9 @@ with results as (
         car_number, grid, position, position_order, is_classified,
         points, laps, race_time_ms, status, status_category
     from {{ ref('slv_f1__results') }}
+    {% if is_incremental() %}
+    where season_year >= (select max(season_year) from {{ this }})
+    {% endif %}
 
 ),
 
