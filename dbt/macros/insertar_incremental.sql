@@ -33,6 +33,7 @@
 
 
 {% macro ver_2025() %}
+    {# ---------- SILVER: lo que hay de 2025 (esperado: 7 filas) ---------- #}
     {% set q %}
         select 'races' as modelo, id_race as clave, race_name as detalle
         from {{ ref('slv_f1__races') }} where season_year = 2025
@@ -52,9 +53,49 @@
 
     {% set r = run_query(q) %}
 
+    {{ log('--- SILVER ---', info=True) }}
     {% for fila in r.rows %}
         {{ log(fila[0] ~ ' | ' ~ fila[2] ~ ' | ' ~ fila[1], info=True) }}
     {% endfor %}
-
     {{ log('Filas de 2025 en Silver: ' ~ (r.rows | length) ~ ' (esperado: 7)', info=True) }}
+
+    {# ---------- GOLD: filas de 2025 por modelo (esperado: 16 en total) ---------- #}
+    {% set g %}
+        select 'gold_results__enriched' as modelo, count(*) as n
+        from {{ ref('gold_results__enriched') }} where season_year = 2025
+        union all
+        select 'int_f1__driver_season_c1', count(*)
+        from {{ ref('int_f1__driver_season_c1') }} where season_year = 2025
+        union all
+        select 'int_f1__driver_season_c2', count(*)
+        from {{ ref('int_f1__driver_season_c2') }} where season_year = 2025
+        union all
+        select 'int_f1__driver_season_c3', count(*)
+        from {{ ref('int_f1__driver_season_c3') }} where season_year = 2025
+        union all
+        select 'fct_driver_race', count(*)
+        from {{ ref('fct_driver_race') }} where season_year = 2025
+        union all
+        select 'fct_driver_season', count(*)
+        from {{ ref('fct_driver_season') }} where season_year = 2025
+        union all
+        select 'dim_race', count(*)
+        from {{ ref('dim_race') }} where season_year = 2025
+        union all
+        select 'dim_driver', count(*)
+        from {{ ref('dim_driver') }} where driver_ref like 'test_driver%'
+        union all
+        select 'dim_constructor', count(*)
+        from {{ ref('dim_constructor') }} where constructor_ref = 'test_constructor'
+    {% endset %}
+
+    {% set rg = run_query(g) %}
+    {% set ns = namespace(total=0) %}
+
+    {{ log('--- GOLD ---', info=True) }}
+    {% for fila in rg.rows %}
+        {{ log(fila[0] ~ ' | ' ~ fila[1], info=True) }}
+        {% set ns.total = ns.total + fila[1] %}
+    {% endfor %}
+    {{ log('Filas de 2025 en Gold: ' ~ ns.total ~ ' (esperado: 16)', info=True) }}
 {% endmacro %}

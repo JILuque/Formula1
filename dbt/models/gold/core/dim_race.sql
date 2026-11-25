@@ -2,6 +2,13 @@
 -- dim_race: una fila por carrera (2000-2024) con los datos del circuito ya incluidos.
 ------------------------------------------------------------
 
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id_race',
+    on_schema_change='fail'
+) }}
+
 with races as (
 
     select id_race, season_year, round, race_name, race_date, has_sprint, id_circuit

@@ -8,6 +8,13 @@
 -- Opción A: se excluyen carreras con estado mechanical (y not_started). Granularidad: 1 fila por piloto y temporada.
 ------------------------------------------------------------
 
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key=['id_driver', 'season_year'],
+    on_schema_change='fail'
+) }}
+
 with results as (
 
     select id_driver, id_constructor, season_year, position_order, points, status_category
@@ -22,7 +29,7 @@ sprint as (
 
 ),
 
--- Puntos de carrera + sprint por constructor y temporada. Desempate: victorias y, por último, el id para que el orden sea siempre el mismo
+-- Puntos de carrera + sprint por constructor y temporada. Desempate: victorias y, el id para que el orden sea siempre el mismo
 constructor_points as (
 
     select

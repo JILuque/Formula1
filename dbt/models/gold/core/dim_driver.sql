@@ -3,6 +3,13 @@
 -- Las métricas de carrera (carreras, victorias, podios) se calculan solo con carreras en las que tomó la salida.
 ------------------------------------------------------------
 
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id_driver',
+    on_schema_change='fail'
+) }}
+
 with drivers as (
 
     select

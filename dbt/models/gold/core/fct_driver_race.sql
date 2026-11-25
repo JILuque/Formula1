@@ -3,6 +3,13 @@
 -- Claves hacia dim_driver, dim_constructor y dim_race, más las medidas de carrera, clasificación y sprint.
 ------------------------------------------------------------
 
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id_driver_race',
+    on_schema_change='fail'
+) }}
+
 with enriched as (
 
     select * from {{ ref('gold_results__enriched') }}

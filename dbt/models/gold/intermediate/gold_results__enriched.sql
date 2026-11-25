@@ -3,6 +3,13 @@
 -- Clasificación y sprint pueden ser nulos: faltan clasificaciones de 2000-2002 y solo hay sprint en 18 carreras.
 ------------------------------------------------------------
 
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key=['id_race', 'id_driver'],
+    on_schema_change='fail'
+) }}
+
 with results as (
 
     select
