@@ -59,13 +59,13 @@ models:
       +group: analitica_f1 
       intermediate:
         +tags: ['intermediate']
-        +materialized: view
+        +materialized: incremental
         +schema: intermediate
         +access: private
 
       core:
         +tags: ['core']
-        +materialized: table
+        +materialized: incremental
         +schema: core
         +access: public
         +grants:

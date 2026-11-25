@@ -29,7 +29,7 @@ sprint as (
 
 ),
 
--- Puntos de carrera + sprint por constructor y temporada. Desempate: victorias y, el id para que el orden sea siempre el mismo
+-- Puntos de carrera + sprint por constructor y temporada. Desempate:rank() con puntos y victorias.
 constructor_points as (
 
     select

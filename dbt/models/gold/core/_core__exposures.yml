@@ -8,4 +8,4 @@ exposures:
       - ref('dim_driver')
     owner:
       name: Equipo de Analítica F1
-      email: tu-correo@ejemplo.com
+      email: equipo_analitica@f1.com
