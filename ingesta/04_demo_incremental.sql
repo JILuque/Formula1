@@ -6,6 +6,9 @@
 --   sp_demo_cargar()  -> borra los datos de prueba si estaban y carga
 --                        calendario_test.csv y resultados_test.csv con COPY INTO.
 --   sp_demo_limpiar() -> borra los datos de prueba de Bronze.
+-- Y dos tasks sin horario (task_demo_cargar y task_demo_limpiar) que solo llaman a
+-- esos procedimientos. Los macros insertar_incremental y limpiar_incremental las
+-- lanzan con `execute task`, asi que son la pieza que une dbt con Snowflake.
 --
 -- execute as owner: se ejecutan con los permisos de SYSADMIN (propietario de las
 -- tablas), asi que DEV_TRANSFORM_ROLE solo necesita USAGE sobre ellos y Bronze
@@ -62,3 +65,32 @@ $$;
 grant usage on schema DEV_BRONZE_DB.public to role DEV_TRANSFORM_ROLE;
 grant usage on procedure DEV_BRONZE_DB.public.sp_demo_cargar()   to role DEV_TRANSFORM_ROLE;
 grant usage on procedure DEV_BRONZE_DB.public.sp_demo_limpiar()  to role DEV_TRANSFORM_ROLE;
+
+-- -----------------------------------------------------------------------------
+-- Tasks que usan los macros de dbt (sin SCHEDULE: solo se lanzan a mano con EXECUTE TASK)
+-- -----------------------------------------------------------------------------
+create or replace task DEV_BRONZE_DB.public.task_demo_cargar
+    warehouse = WH_PROYECTO
+    comment = 'Demo incremental: carga los datos de prueba en Bronze (la lanza el macro insertar_incremental)'
+as
+    call DEV_BRONZE_DB.public.sp_demo_cargar();
+
+create or replace task DEV_BRONZE_DB.public.task_demo_limpiar
+    warehouse = WH_PROYECTO
+    comment = 'Demo incremental: borra los datos de prueba de Bronze (la lanza el macro limpiar_incremental)'
+as
+    call DEV_BRONZE_DB.public.sp_demo_limpiar();
+
+-- Para lanzar una task con EXECUTE TASK hacen falta dos cosas:
+--   1) que el rol propietario de la task (SYSADMIN) tenga el privilegio global EXECUTE TASK
+--      (solo lo puede conceder ACCOUNTADMIN; se hace una vez por cuenta)
+--   2) que el rol que ejecuta (DEV_TRANSFORM_ROLE, el de dbt) tenga OPERATE sobre la task
+use role accountadmin;
+grant execute task on account to role sysadmin;
+
+use role sysadmin;
+grant operate on task DEV_BRONZE_DB.public.task_demo_cargar  to role DEV_TRANSFORM_ROLE;
+grant operate on task DEV_BRONZE_DB.public.task_demo_limpiar to role DEV_TRANSFORM_ROLE;
+
+-- Comprobacion rapida (como SYSADMIN): deben salir las dos tasks
+show tasks in schema DEV_BRONZE_DB.public;
