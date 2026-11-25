@@ -6,6 +6,7 @@ models:
   config:
     contract:
       enforced: true
+    on_schema_change: fail
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
@@ -360,6 +361,9 @@ unit_tests:
   - name: test_fct_driver_season_score
     description: "Con dos pilotos fiables (A y B) y uno sin muestra fiable (D), comprueba los z-scores, el score (z_c1 - z_c2 + z_c3) / 3 y que D tiene score nulo sin alterar la media de la temporada."
     model: fct_driver_season
+    overrides:
+      macros:
+        is_incremental: false
     given:
       - input: ref('int_f1__driver_season_c1')
         rows:
@@ -386,6 +390,8 @@ unit_tests:
     description: "Con un solo piloto fiable en la temporada la desviación es 0: los z-scores y el score quedan nulos y no hay error de división por cero."
     model: fct_driver_season
     overrides:
+      macros:
+        is_incremental: false
       vars:
         min_valid_races: 8
         min_duels: 10
