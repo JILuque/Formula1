@@ -1,9 +1,9 @@
 snapshots:
-  - name: status_classification_snapshot
-    description: "Historial de la clasificación de estados (seed status_classification). Cada vez que cambia la categoría de un estado, se cierra la versión anterior (dbt_valid_to) y se abre la nueva. La versión vigente tiene dbt_valid_to nulo."
-    relation: ref('status_classification')
+  - name: points_scoring_system_snapshot
+    description: "Historial del reglamento de puntos (seed points_scoring_system). Si cambia la puntuación de una regla (por ejemplo, se elimina el punto de vuelta rápida), se cierra la versión anterior (dbt_valid_to) y se abre la nueva. La versión vigente tiene dbt_valid_to nulo. Permite saber con qué reglamento se validaron los puntos del origen en cada carga."
+    relation: ref('points_scoring_system')
     config:
-      unique_key: status
+      unique_key: scoring_rule_id
       strategy: check
-      check_cols: [status_category]
+      check_cols: [points, fastest_lap_bonus]
       hard_deletes: new_record

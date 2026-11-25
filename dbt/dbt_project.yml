@@ -85,6 +85,15 @@ seeds:
         status_id: integer
         status: varchar(100)
         status_category: varchar(30)
+    points_scoring_system:
+      +column_types:
+        scoring_rule_id: varchar(40)
+        session_type: varchar(10)
+        season_from: integer
+        season_to: integer
+        position: integer
+        points: integer
+        fastest_lap_bonus: integer
 
 ### SNAPSHOTS
 snapshots:

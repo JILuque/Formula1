@@ -28,3 +28,47 @@ seeds:
           - accepted_values:
               arguments:
                 values: ['finished', 'mechanical', 'driver_incident', 'other_not_finished', 'not_started']
+
+  - name: points_scoring_system
+    description: Reglamento de puntos de la F1 por época y posición, para carrera y sprint
+      (2000-2024). Regla de negocio propia del proyecto, no existe en el origen. Solo se usa en
+      el test assert_puntos_segun_reglamento y en su snapshot; ningún modelo recalcula los puntos.
+      season_from y season_to son la vigencia del reglamento, no la del dato en el warehouse
+      (esa la guarda el snapshot).
+    columns:
+      - name: scoring_rule_id
+        description: "Clave de la regla, con formato tipo_sesion|temporadas|posición. Es la unique_key del snapshot."
+        data_tests:
+          - unique
+          - not_null
+      - name: session_type
+        description: Tipo de sesión puntuable, race o sprint.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['race', 'sprint']
+      - name: season_from
+        description: Primera temporada en la que se aplica la regla.
+        data_tests:
+          - not_null
+      - name: season_to
+        description: Última temporada en la que se aplica la regla.
+        data_tests:
+          - not_null
+      - name: position
+        description: Posición final clasificada que puntúa.
+        data_tests:
+          - not_null
+      - name: points
+        description: Puntos que otorga esa posición en esa época.
+        data_tests:
+          - not_null
+      - name: fastest_lap_bonus
+        description: 1 si en esa época la vuelta rápida de un piloto del top 10 sumaba un punto extra (carrera 2019-2024), 0 si no.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+
