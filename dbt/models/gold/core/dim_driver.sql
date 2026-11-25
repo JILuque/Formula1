@@ -1,6 +1,8 @@
 ------------------------------------------------------------
 -- dim_driver: una fila por piloto (2000-2024) con sus datos y un resumen de su carrera en el periodo.
 -- Las métricas de carrera (carreras, victorias, podios) se calculan solo con carreras en las que tomó la salida.
+-- Incremental (merge): solo reprocesa los pilotos que aparecen desde la última temporada cargada, pero con todo su historial,
+-- porque sus totales de carrera dependen de todas sus temporadas.
 ------------------------------------------------------------
 
 {{ config(
@@ -21,6 +23,9 @@ with drivers as (
         driver_nationality,
         last_season_year
     from {{ ref('slv_f1__drivers') }}
+    {% if is_incremental() %}
+    where last_season_year >= (select max(last_season_year) from {{ this }})
+    {% endif %}
 
 ),
 
@@ -29,6 +34,9 @@ results as (
     select id_driver, season_year, position_order, status_category
     from {{ ref('slv_f1__results') }}
     where coalesce(status_category, 'unknown') <> 'not_started'
+    {% if is_incremental() %}
+      and id_driver in (select id_driver from drivers)
+    {% endif %}
 
 ),
 

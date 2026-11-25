@@ -1,6 +1,8 @@
 ------------------------------------------------------------
 -- dim_constructor: una fila por constructor (2000-2024) con sus datos y un resumen de su participación.
 -- Las victorias son victorias de carrera de cualquiera de sus pilotos (solo cuentan carreras con salida).
+-- Incremental (merge): solo reprocesa los constructores que aparecen desde la última temporada cargada, pero con todo su historial,
+-- porque sus totales dependen de todas sus temporadas.
 ------------------------------------------------------------
 
 {{ config(
@@ -19,6 +21,9 @@ with constructors as (
         constructor_nationality,
         last_season_year
     from {{ ref('slv_f1__constructors') }}
+    {% if is_incremental() %}
+    where last_season_year >= (select max(last_season_year) from {{ this }})
+    {% endif %}
 
 ),
 
@@ -27,6 +32,9 @@ results as (
     select id_constructor, season_year, position_order
     from {{ ref('slv_f1__results') }}
     where coalesce(status_category, 'unknown') <> 'not_started'
+    {% if is_incremental() %}
+      and id_constructor in (select id_constructor from constructors)
+    {% endif %}
 
 ),
 
