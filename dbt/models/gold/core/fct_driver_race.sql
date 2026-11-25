@@ -1,6 +1,7 @@
 ------------------------------------------------------------
 -- fct_driver_race: tabla de hechos, una fila por piloto y carrera.
 -- Claves hacia dim_driver, dim_constructor y dim_race, más las medidas de carrera, clasificación y sprint.
+-- Incremental (merge): solo reprocesa desde la última temporada ya cargada.
 ------------------------------------------------------------
 
 {{ config(
@@ -13,6 +14,9 @@
 with enriched as (
 
     select * from {{ ref('gold_results__enriched') }}
+    {% if is_incremental() %}
+    where season_year >= (select max(season_year) from {{ this }})
+    {% endif %}
 
 )
 

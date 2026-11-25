@@ -7,6 +7,7 @@
 --y en clasificación si alguno no tiene tiempo de Q1.
 --Cada duelo genera dos filas en el CTE duels, una desde cada piloto.
 --Va con signo positivo en la puntuación final: más duelos ganados, mejor.
+--Incremental (merge): un duelo solo depende de su temporada, así que se recalcula solo desde la última temporada cargada.
 -----------------------------------------------------------------------------
 
 {{ config(
@@ -43,12 +44,19 @@ sprint as (
     where coalesce(status_category, 'unknown') not in ('mechanical', 'not_started')
 ),
 
-sessions as (
+sessions_all as (
     select * from race
     union all
     select * from qualifying
     union all
     select * from sprint
+),
+
+sessions as (
+    select * from sessions_all
+    {% if is_incremental() %}
+    where season_year >= (select max(season_year) from {{ this }})
+    {% endif %}
 ),
 
 duels as (

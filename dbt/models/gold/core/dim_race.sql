@@ -1,5 +1,6 @@
 ------------------------------------------------------------
 -- dim_race: una fila por carrera (2000-2024) con los datos del circuito ya incluidos.
+-- Incremental (merge): solo reprocesa desde la última temporada ya cargada.
 ------------------------------------------------------------
 
 {{ config(
@@ -13,6 +14,9 @@ with races as (
 
     select id_race, season_year, round, race_name, race_date, has_sprint, id_circuit
     from {{ ref('slv_f1__races') }}
+    {% if is_incremental() %}
+    where season_year >= (select max(season_year) from {{ this }})
+    {% endif %}
 
 ),
 

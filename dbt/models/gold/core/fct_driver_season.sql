@@ -3,6 +3,8 @@
 -- score = (z_c1 - z_c2 + z_c3) / 3  -> pesos exactos de 1/3; C2 resta porque es una tasa de incidentes (peor cuanto mayor).
 -- Los z-scores se calculan dentro de cada temporada y solo con muestras fiables (is_reliable_sample),
 -- para que un piloto con 1 carrera no distorsione la media ni la desviación. Si no es fiable, el score es null.
+-- Incremental (merge): los z-scores se calculan dentro de cada temporada, así que solo se recalcula desde la última temporada cargada.
+-- Limitación asumida: hereda la de C3 (el C3 de temporadas anteriores no se actualiza hasta un --full-refresh periódico).
 ------------------------------------------------------------
 
 {{ config(
@@ -20,6 +22,9 @@ with c1 as (
 c2 as (
     select id_driver, season_year, n_races, n_incidents, c2_incident_rate
     from {{ ref('int_f1__driver_season_c2') }}
+    {% if is_incremental() %}
+    where season_year >= (select max(season_year) from {{ this }})
+    {% endif %}
 ),
 
 c3 as (

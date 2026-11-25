@@ -6,6 +6,9 @@
 -- Puesto esperado = media de puesto final de los coches de ese puesto de constructor (todas las temporadas 2000-2024).
 -- c3_positions_vs_car = media de (puesto esperado - puesto final): positivo = rinde por encima de su coche.
 -- Opción A: se excluyen carreras con estado mechanical (y not_started). Granularidad: 1 fila por piloto y temporada.
+-- Incremental (merge): el puesto esperado se calcula con TODO el histórico (se lee entero, es pequeño), pero solo se escriben
+-- las filas desde la última temporada cargada. Limitación asumida: al entrar una temporada nueva, la media cambia y el C3 de las
+-- temporadas anteriores no se actualiza hasta lanzar un --full-refresh (se haría de forma periódica).
 ------------------------------------------------------------
 
 {{ config(
@@ -29,7 +32,7 @@ sprint as (
 
 ),
 
--- Puntos de carrera + sprint por constructor y temporada. Desempate: victorias y, el id para que el orden sea siempre el mismo
+-- Puntos de carrera + sprint por constructor y temporada. Desempate: victorias; si siguen empatados comparten puesto (rank)
 constructor_points as (
 
     select
@@ -83,4 +86,7 @@ select
     count(*) as n_races,
     avg(expected_position - position_order) as c3_positions_vs_car
 from valid_races
+{% if is_incremental() %}
+where season_year >= (select max(season_year) from {{ this }})
+{% endif %}
 group by id_driver, season_year
