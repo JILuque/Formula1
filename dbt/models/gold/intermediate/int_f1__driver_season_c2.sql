@@ -5,6 +5,13 @@
 --Va con signo negativo en la puntuación final: más incidentes, peor.
 -----------------------------------------------------------------------------
 
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key=['id_driver', 'season_year'],
+    on_schema_change='fail'
+) }}
+
 select
       id_driver
     , season_year

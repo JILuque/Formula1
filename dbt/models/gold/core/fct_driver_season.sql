@@ -5,6 +5,13 @@
 -- para que un piloto con 1 carrera no distorsione la media ni la desviación. Si no es fiable, el score es null.
 ------------------------------------------------------------
 
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id_driver_season',
+    on_schema_change='fail'
+) }}
+
 with c1 as (
     select id_driver, season_year, n_duels, c1_win_rate
     from {{ ref('int_f1__driver_season_c1') }}

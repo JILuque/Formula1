@@ -9,6 +9,13 @@
 --Va con signo positivo en la puntuación final: más duelos ganados, mejor.
 -----------------------------------------------------------------------------
 
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key=['id_driver', 'season_year'],
+    on_schema_change='fail'
+) }}
+
 with race as (
     select
           id_race, season_year, id_driver, id_constructor

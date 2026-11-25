@@ -3,6 +3,13 @@
 -- Las victorias son victorias de carrera de cualquiera de sus pilotos (solo cuentan carreras con salida).
 ------------------------------------------------------------
 
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id_constructor',
+    on_schema_change='fail'
+) }}
+
 with constructors as (
 
     select
