@@ -17,6 +17,128 @@ Fecha de entrega: 26 de noviembre de 2026.
  
 ## Entradas
  
+### 2026-11-26: tests de integridad (un ganador por carrera y sin valores negativos)
+**Qué hice:** dos tests singulares nuevos en `tests/singular`, tomando la idea de lo que vi en
+otros proyectos del curso:
+- `assert_un_ganador_por_carrera`: cada carrera y cada sprint de Silver tiene exactamente una fila
+  con posición 1. Devuelve las sesiones con cero ganadores o con más de uno.
+- `assert_sin_valores_negativos`: ni puntos, parrilla, vueltas ni tiempos (en milisegundos)
+  pueden ser negativos en resultados, sprint y clasificación. Las posiciones ya las vigilaban los
+  `accepted_range` de los `.yml`; `grid = 0` es válido (salida desde el pit lane).
+Prueba fuera de Snowflake (DuckDB sobre los CSV): los dos dan 0 filas (479 carreras y 18 sprints
+con un solo ganador). Controles negativos: borrar al ganador de una carrera o poner un punto
+negativo hace que el test devuelva esa fila.
+**Por qué lo hice así (y qué alternativa descarté):**
+- **Reglas entre filas en un test singular.** «Un solo ganador por carrera» no se puede expresar
+  como un test de una columna; los de una columna ya están en los `.yml`.
+- **Error y no aviso.** Una carrera sin ganador o un valor negativo indican un dato roto o una fila
+  perdida en Silver, y no debe pasar a Gold.
+- **Descarté comprobar el campeón de pilotos y de constructores contra una lista de campeones.**
+  Lo probé: cuadraba con los 25 campeones de 2000-2024 salvo 2007 en constructores (McLaren sale
+  primera por puntos brutos, aunque oficialmente ganó Ferrari). Lo descarté porque obligaba a
+  escribir a fuego en el test una lista de valores externos al dato: si cambia el rango de
+  temporadas o se recarga el origen, hay que mantenerla a mano, y la excepción de 2007 habría
+  quedado enterrada en el test. Prefiero tests cuyo resultado se derive del propio dato.
+**Problemas encontrados y cómo los resolví:** ninguno; los datos cuadraban a la primera.
+**Pendiente / siguiente paso:** [Confirmar: `dbt test --select assert_un_ganador_por_carrera
+assert_sin_valores_negativos` en DEV da 0 filas].
+ 
+---
+ 
+### 2026-11-26: seed del reglamento de puntos, test contra el origen y snapshot (sustituye al de estados)
+**Qué hice:**
+- **Seed `points_scoring_system`** (`seeds/points_scoring_system.csv`, 45 filas): cómo se reparten los
+  puntos por época y posición, para carrera (2000-2002, 2003-2009, 2010-2018 y 2019-2024) y para
+  sprint (2021 y 2022-2024). Columnas: `scoring_rule_id`, `session_type`, `season_from`,
+  `season_to`, `position`, `points`, `fastest_lap_bonus`. Con tests de `unique`, `not_null` y
+  `accepted_values` en `_seeds.yml`.
+- **Test `assert_puntos_segun_reglamento`** (`tests/singular`, `severity: warn`): compara los
+  puntos de `slv_f1__results` y `slv_f1__sprint_results` con la seed. Vale el punto de la seed o
+  ese punto más el bonus de vuelta rápida. Las tres carreras con reglas especiales están
+  declaradas dentro del test con su multiplicador (Malasia 2009 ×0,5, Abu Dabi 2014 ×2, Spa 2021
+  ×0,5), así que se comprueban en vez de excluirse.
+- **Snapshot `points_scoring_system_snapshot`** (`snapshots/_snapshots.yml`): `unique_key:
+  scoring_rule_id`, `strategy: check` sobre `points` y `fastest_lap_bonus`, `hard_deletes:
+  new_record`. **Sustituye a `status_classification_snapshot`**, que elimino (ver la entrada del
+  día 5, 23 de noviembre, y la decisión de la tabla de abajo).
+- **Prueba fuera de Snowflake** (DuckDB sobre los CSV de `ingesta/csv`): de 7.938 posiciones
+  clasificadas de carrera 2000-2024, 28 no coincidían con la seed, todas en esas tres carreras.
+  Con los multiplicadores declarados: 0 filas. Sprint (345 posiciones): 0. Control negativo: si
+  pongo el bonus de vuelta rápida a 0 en la seed, el test avisa en 113 filas.
+**Por qué lo hice así (y qué alternativa descarté):**
+- **Los puntos del origen se usan tal cual, la seed solo los valida.** Alternativa: recalcular
+  los puntos desde la posición con la seed y usar esos en C3. Cambiaría el ranking de constructores
+  el día antes de la entrega y no aporta nada: los puntos solo ordenan a los constructores dentro
+  de cada temporada y nunca se comparan entre épocas (C1, C2 y C3 son métricas de posición y los
+  z-scores se calculan por temporada).
+- **Por qué sí un snapshot aquí y no en los estados.** La seed de estados casi no cambia y Git ya
+  la versiona. El reglamento sí cambia con el tiempo (en 2025 se eliminó el punto de la vuelta
+  rápida) y el proyecto está pensado para volver a cargar el dataset de Kaggle cuando se
+  actualice. Entonces se añade o se cierra una regla y el snapshot guarda con qué reglamento se
+  validó cada carga. Limitación asumida: con datos que acaban en 2024 hoy tiene una sola versión
+  por regla; la historia aparece cuando el reglamento cambie.
+- **Dos vigencias distintas.** `season_from` y `season_to` son la vigencia del reglamento;
+  `dbt_valid_from` y `dbt_valid_to` son la vigencia del dato en mi warehouse.
+- **`severity: warn`** y no `error`: si cambia el reglamento y aún no he actualizado la seed, el
+  aviso debe verse sin tumbar el despliegue.
+- **Un snapshot en vez de dos.** Mantener también el de estados no tenía motivo.
+**Problemas encontrados y cómo los resolví:** al contrastar con los datos aparecieron 28 filas que
+no cuadraban; eran tres carreras con puntos reducidos o dobles. Las modelé como excepciones con
+multiplicador dentro del test.
+**Comprobado en DEV (26-11):** `dbt seed`, `dbt snapshot` y `dbt test` de la seed y del test
+funcionan sin errores, y la tabla `status_classification_snapshot` está borrada en DEV.
+**Pendiente / siguiente paso:** borrar la tabla del snapshot antiguo en PRO: `drop table if exists
+PRO_SILVER_DB.snapshots.status_classification_snapshot;`. El job diario de PRO excluye los
+snapshots, así que `points_scoring_system_snapshot` solo existirá en PRO cuando se ejecute
+`dbt snapshot` allí [Decidir si hace falta para la defensa; en DEV ya funciona].
+ 
+---
+ 
+### 2026-11-25: mini caso de uso «perjuicio del coche» (consulta en `analyses/`)
+**Qué hice:** añadí una segunda lectura del caso de uso. Si el ranking ajustado sube a Alonso del
+5.º al 1.º porque su coche no reflejaba lo que hacía, ¿qué equipo explica esa diferencia? Es una
+consulta, `analyses/perjuicio_coche.sql`, que lee solo de modelos públicos de Gold
+(`fct_driver_race`, `dim_driver` y `dim_constructor`). No cambia ningún modelo del pipeline.
+Método (el mismo que C3): nivel del coche = puesto del constructor en el campeonato de la
+temporada (puntos de carrera y sprint, desempate por victorias); puesto esperado de cada nivel =
+media del puesto final de esos coches en 2000-2024 (sin averías ni no salidas); perjuicio de una
+carrera = puesto esperado de su coche − puesto esperado del coche campeón. Se agrupa por piloto y
+constructor y se muestra el equipo con mayor media de puestos perdidos por carrera. Solo salen los
+pilotos del top 15 del ranking (`top_n_ranking`, con valor por defecto en la propia consulta; la
+consulta repite el cálculo de `ranking.sql`, con su mínimo de 100 carreras). Mínimo de 30 carreras
+con el equipo (`min_stint_races`, también con valor por defecto).
+Resultado de prueba, calculado con los CSV fuera de dbt: Alonso → McLaren (73 carreras, 6,5 puestos
+por carrera); Hamilton → McLaren (1,7); Verstappen → Red Bull (1,8); Vettel → Aston Martin (7,7)
+[Completar: ejecutar `dbt show --select perjuicio_coche` en DEV, comprobar que salen los 15 del
+ranking y que estas cifras coinciden].
+ 
+**Por qué lo hice así (y qué alternativa descarté):**
+- **Consulta y no modelo.** Alternativa: un modelo de Gold con tests. El pipeline ya está validado
+  y no quise repetir la prueba completa un día antes de entregar; se promociona a modelo si hace
+  falta en Power BI. Sigue siendo un único caso de uso grande con una segunda lectura, como decidí
+  el 5 de noviembre.
+- **Media por carrera y no total acumulado.** La primera versión ordenaba por total y, al agrupar
+  por linaje, señalaba a Alpine para Alonso (130 carreras, con los títulos de Renault). El total
+  premia al equipo con el que más años estuvo, no al peor coche.
+- **Referencia = coche campeón de cada año.** Alternativa: la media del campo. El campeón se
+  explica en una frase («cuántos puestos le cuesta no tener el mejor coche»).
+- **Sin seed de linajes.** Alternativa: una seed que una Toro Rosso, AlphaTauri y RB (y otros
+  renombrados) en un mismo equipo. Obligaba a añadir una columna a `dim_constructor`
+  (`--full-refresh` en DEV y PRO) y más tests un día antes de entregar. Queda como mejora futura.
+- **Top del ranking calculado dentro de la consulta.** Alternativa: leerlo de un modelo; el ranking
+  vive en `analyses/ranking.sql` y no es un modelo, así que repito su cálculo (seis líneas). Si el
+  ranking pasa a modelo, esta consulta lo leerá de ahí.
+- **Limitación asumida:** el origen trata cada renombrado como un constructor distinto, así que
+  Toro Rosso, AlphaTauri y RB cuentan por separado y a quien pasó por varios le sale solo el
+  tramo más perjudicial dentro de uno de ellos.
+- **El análisis mide el nivel del coche, no al piloto:** quien pasa muchos años en un mal coche
+  sale «perjudicado» aunque no tuviera nada que ganar; por eso se enseña la media por carrera.
+**Problemas encontrados y cómo los resolví:** el orden por total acumulado señalaba a un equipo con
+el que Alonso ganó dos títulos (ver arriba).
+**Pendiente / siguiente paso:** ejecutar la consulta en DEV y comparar con los resultados de arriba.
+ 
+---
+ 
 ### 2026-11-25: incrementalidad en todo Gold (la cadena incremental llega hasta el ranking)
 **Qué hice:** el profesor avisó de que un error grave es hacer incremental en Silver y no
 pasarlo a Gold, porque el ahorro se pierde en el eslabón más débil. Convertí en incrementales
@@ -291,6 +413,8 @@ limpia de la macro) y un job aparte para `dbt snapshot`.
 ---
  
 ### 2026-11-23: día 5 (on_schema_change y snapshot de la clasificación de estados)
+> **Actualización 26-11:** el snapshot de `status_classification` se eliminó y lo sustituye el de la seed `points_scoring_system` (ver la entrada del 26 de noviembre).
+ 
 **Qué hice:**
 - **`on_schema_change='fail'`** en la config de los 7 modelos incrementales de Silver
   (`slv_f1__circuits`, `constructors`, `drivers`, `races`, `results`, `qualifying` y
@@ -1296,8 +1420,9 @@ el 03 para recrear los clones y los permisos.
 | Lookback por temporada (`>=` sobre la última temporada cargada) con `merge` | Lookback de una hora sobre `date_load`; `append`; `delete+insert` | La carga es estática y la unidad natural del dato es la temporada; `append` duplicaría lo que se relee y `merge` es la estrategia vista en clase |
 | Sin deduplicar el lote en los hechos de Silver | `qualify row_number()` en `results`, `qualifying` y `sprint_results` | El origen es único en 2000-2024, los `unique` lo vigilan y Snowflake falla si el `merge` encuentra claves duplicadas |
 | Sin microbatch ni `full_refresh: false` | Microbatch por año; proteger los incrementales | Los hechos no tienen columna de fecha y los z-scores se calculan por temporada; la demo y los cambios de clasificación necesitan `--full-refresh` |
-| Snapshot de la seed `status_classification` con `check` sobre `status_category` | Snapshot de pilotos o resultados; estrategia `timestamp`; no hacer snapshot | Los datos de F1 no cambian; la clasificación es la única regla mía que cambia y mueve el score; la seed no tiene columna de última modificación. Ningún modelo lo lee: es una tabla de auditoría |
-| Snapshot con `hard_deletes: new_record` y `+transient: false` | `ignore` (defecto); tabla transient | Un estado borrado de la seed queda registrado; la historia no se puede reconstruir desde Bronze y necesita Fail-safe |
+| Snapshot de la seed `points_scoring_system` con `check` sobre `points` y `fastest_lap_bonus`; se elimina el de `status_classification` | Mantener el de estados; snapshot de `fct_driver_season`; sin snapshots | El reglamento sí cambia con el tiempo y el proyecto puede recargar Kaggle; los estados casi no cambian y Git ya versiona su CSV. Ningún modelo lo lee: es una tabla de auditoría |
+| Seed del reglamento solo para validar (test `assert_puntos_segun_reglamento`), sin recalcular puntos | Recalcular los puntos desde la seed y usarlos en C3 | Los puntos solo ordenan constructores dentro de cada temporada; recalcular movería el ranking el día antes de entregar |
+| Snapshot con `hard_deletes: new_record` y `+transient: false` | `ignore` (defecto); tabla transient | Una regla de puntos borrada de la seed queda registrada; la historia no se puede reconstruir desde Bronze y necesita Fail-safe |
 | Umbrales del score (`min_valid_races`, `min_duels`, `min_career_races`) como `var()` | Escribirlos en el SQL; también convertir los pesos en variables | Decisión metodológica común a todos los entornos; permite probar la sensibilidad del ranking con `--vars`. Los pesos se quedan fijos |
 | Unit tests de `fct_driver_season` con `overrides: vars:` | Dejar que lean el valor del proyecto | Comprueban la fórmula, no la configuración |
 | `generate_schema_name` del curso (schema limpio con target `dev` o `pro`, prefijo en el IDE) | Mantener la del día 4 (nunca prefijo) | Separa el desarrollo en el IDE del despliegue en los jobs; conserva la separación DEV/PRO por base de datos. Sin `pre`; con la rama de CI aunque no haya jobs de CI |
@@ -1315,6 +1440,10 @@ el 03 para recrear los clones y los permisos.
 | Dimensiones incrementales por claves afectadas (con todo su historial) | Filtrar solo por temporada; full refresh | Son totales de toda la carrera: filtrar por temporada daría totales incorrectos |
 | C3 lee todo el histórico y escribe solo la última temporada, con `--full-refresh` periódico | Filtrar también la entrada; dejar C3 en full refresh | La media del puesto esperado necesita todas las temporadas; la limitación (C3 de temporadas antiguas desfasado hasta el full refresh) es pequeña y está documentada |
 | Demo con `--vars '{season_end: 2025}'` y limpieza con `--full-refresh` de Silver y Gold | Subir `season_end` en el proyecto; borrar filas a mano | `season_end` es una decisión metodológica (2000-2024); la limpieza se reproduce con un solo comando |
+| Dos tests singulares de integridad (un ganador por carrera y sprint, sin valores negativos), con error | Comparar el campeón con una lista oficial; tests genéricos por columna; dejarlos en aviso | Son reglas entre filas que no caben en un test de columna; un dato roto no debe pasar a Gold; la lista de campeones obligaba a valores a fuego en el test |
+| Perjuicio del coche como consulta en `analyses/`, no como modelo | Modelo de Gold con tests | El pipeline ya está validado y no hay tiempo de repetir la prueba completa; se promociona a modelo si hace falta en Power BI |
+| Equipo que más perjudica = mayor media de puestos perdidos por carrera (mínimo 30 carreras), con el coche campeón como referencia | Total acumulado; media del campo | El total premia al equipo con el que más años estuvo; el campeón se explica en una frase |
+| Sin seed de linajes de equipos (mejora futura) | Seed `constructor_lineage` con columna en `dim_constructor` | Obligaba a `--full-refresh` en DEV y PRO y a más tests un día antes de entregar |
  
  
 ## Errores y soluciones (rellenar según aparezcan)

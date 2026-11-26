@@ -22,8 +22,6 @@ create schema if not exists DEV_BRONZE_DB.f1;
 
 create database if not exists DEV_SILVER_DB;
 create database if not exists DEV_GOLD_DB;
-create database if not exists PRE_SILVER_DB;
-create database if not exists PRE_GOLD_DB;
 create database if not exists PRO_SILVER_DB;
 create database if not exists PRO_GOLD_DB;
 
@@ -31,7 +29,6 @@ create database if not exists PRO_GOLD_DB;
 --    en el que trabaja, y el de DEV no puede escribir en PRE ni en PRO.
 use role securityadmin;
 create role if not exists DEV_TRANSFORM_ROLE;
-create role if not exists PRE_TRANSFORM_ROLE;
 create role if not exists PRO_TRANSFORM_ROLE;
 
 -- Rol de lectura para consumidores
@@ -39,7 +36,6 @@ create role if not exists REPORTING_ROLE;
 
 -- SYSADMIN hereda los roles funcionales
 grant role DEV_TRANSFORM_ROLE to role sysadmin;
-grant role PRE_TRANSFORM_ROLE to role sysadmin;
 grant role PRO_TRANSFORM_ROLE to role sysadmin;
 grant role REPORTING_ROLE to role sysadmin;
 
@@ -47,12 +43,10 @@ grant role REPORTING_ROLE to role sysadmin;
 -- En un proyecto real, los jobs usan un usuario de servicio.
 select current_user();
 grant role DEV_TRANSFORM_ROLE to user "joig.luque";
-grant role PRE_TRANSFORM_ROLE to user "joig.luque";
 grant role PRO_TRANSFORM_ROLE to user "joig.luque";
 
 -- 4. Warehouse para los tres roles
 grant usage on warehouse WH_PROYECTO to role DEV_TRANSFORM_ROLE;
-grant usage on warehouse WH_PROYECTO to role PRE_TRANSFORM_ROLE;
 grant usage on warehouse WH_PROYECTO to role PRO_TRANSFORM_ROLE;
 
 -- 5. Cada rol puede crear schemas solo en las databases Silver y Gold de su
@@ -60,8 +54,6 @@ grant usage on warehouse WH_PROYECTO to role PRO_TRANSFORM_ROLE;
 --    reemplazar tablas y vistas dentro sin más grants.
 grant usage, create schema on database DEV_SILVER_DB to role DEV_TRANSFORM_ROLE;
 grant usage, create schema on database DEV_GOLD_DB   to role DEV_TRANSFORM_ROLE;
-grant usage, create schema on database PRE_SILVER_DB to role PRE_TRANSFORM_ROLE;
-grant usage, create schema on database PRE_GOLD_DB   to role PRE_TRANSFORM_ROLE;
 grant usage, create schema on database PRO_SILVER_DB to role PRO_TRANSFORM_ROLE;
 grant usage, create schema on database PRO_GOLD_DB   to role PRO_TRANSFORM_ROLE;
 
