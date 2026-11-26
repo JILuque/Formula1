@@ -67,7 +67,7 @@ El doble guion bajo separa la fuente del contenido: `slv_f1__results`.
  
 ## Origen
  
-Dataset [Formula 1 World Championship (1950-2020)](https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020) de Kaggle, ampliado hasta 2024. Se usan tres ficheros planos que ya cruzan varias tablas del original, para quedarse por debajo de 10 tablas de origen:
+Dataset [Formula 1 World Championship (1950-2024)](https://www.kaggle.com/datasets/ignacioluquesanchez/f1-world-championship-1950-2024) de Kaggle, ampliado hasta 2024. Se usan tres ficheros planos que ya cruzan varias tablas del original, para quedarse por debajo de 10 tablas de origen:
  
 | Fichero | Contenido | Filas |
 |---|---|---|
